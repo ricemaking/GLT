@@ -34,6 +34,7 @@ struct RandomnameFirstView: View {
 
 struct ContentView: View
 {
+    @Environment(\.managedObjectContext) var viewContext
     @Binding var previousRunTimestamp: Date?
     @StateObject private var authManager = AuthenticationManager.shared
     @State private var curEmployee: Int32?
@@ -48,6 +49,7 @@ struct ContentView: View
     @State private var clBGColor: Color = Color(hex: "110000")
     @State private var clFGColor: Color = Color(hex: "444444")
     @State private var shouldPromptForAccount: Bool = false
+    @State private var offlineLogin: Bool = false // offlineLogin switch
     @State private var activeLogin: Bool = false
     @State private var path = NavigationPath()
     @State private var targetid: Int32 = 0
@@ -68,12 +70,13 @@ struct ContentView: View
         sortDescriptors: []
     ) var employees: FetchedResults<Employee>
     
+    
     var body: some View
     {
         NavigationStack(path: $path)
         {
             VStack {
-                if loginID != "" {
+                if loginID != "" && activeLogin {
                     Text("Welcome: \(loginID)")
                 }
                 HStack {
@@ -140,6 +143,14 @@ struct ContentView: View
                     }
                 }
                 Spacer()
+                if offlineLogin && !activeLogin {
+                    TextField("Enter your email", text: Binding(
+                        get: { loginID ?? "" },
+                        set: { loginID = $0 }
+                    ))
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .padding()
+                }
             }
             .preferredColorScheme(.dark)
             .navigationDestination(for: AppView.self) { value in
@@ -179,14 +190,20 @@ struct ContentView: View
                     if activeLogin {
                         HStack {
                             Button("Sign Out") {
-                                AuthenticationManager.shared.signOut(revokeRequest: revokeRequest) { success, error in
-                                    if success {
-                                        accessToken = ""
-                                        activeLogin = false
-                                        loginID = ""
+                                if !offlineLogin {
+                                    AuthenticationManager.shared.signOut(revokeRequest: revokeRequest) { success, error in
+                                        if success {
+                                            accessToken = ""
+                                            activeLogin = false
+                                            loginID = ""
+                                        }
                                     }
+                                    path = NavigationPath()
                                 }
-                                path = NavigationPath()
+                                else {
+                                    loginID = ""
+                                    activeLogin = false
+                                }
                             }
                             .fontDesign(.monospaced)
                             .font(.system(size: 18))
@@ -203,73 +220,114 @@ struct ContentView: View
                     }
                     else
                     {
-                        HStack
-                        {
-                            Button("Sign In")
-                            // modify this block
+                        VStack {
+                            HStack
                             {
-                                AuthenticationManager.shared.signIn(shouldPromptForAccount: shouldPromptForAccount, revokeRequest: revokeRequest)
-                                { success, error in
-                                    if success
-                                    {
-                                        AuthenticationManager.shared.acquireTokenSilently
-                                        { token, silentError in
-                                            if let token = token
+                                Button("Sign In") {
+                                // modify this block
+                                    if !offlineLogin {
+                                        AuthenticationManager.shared.signIn(shouldPromptForAccount: shouldPromptForAccount, revokeRequest: revokeRequest)
+                                        { success, error in
+                                            if success
                                             {
-                                                accessToken = token
-                                                jwtPayloadString = AuthenticationManager.shared.extractJWTPayloadString(from: token) ?? "Unknown jwtPayloadString"
-                                                loginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
-                                                activeLogin = true
-                                                revokeRequest = false
-                                                AuthenticationManager.shared.checkOneDriveAccess(accessToken: token) { accessSuccess, accessError in
-                                                               DispatchQueue.main.async {
-                                                                   if accessSuccess {
-                                                                       authManager.fileAccessResultOD = "Access to OneDrive granted."
-                                                                       AuthenticationManager.shared.fetchDirectoryContents(accessToken: token)
-                                                                       AuthenticationManager.shared.fetchSharedItems(accessToken: token)
-
-                                                                   } else {
-                                                                       authManager.fileAccessResult = accessError ?? "Access to OneDrive failed."
-                                                                   }
-                                                               }
-                                                           }
+                                                AuthenticationManager.shared.acquireTokenSilently
+                                                { token, silentError in
+                                                    if let token = token
+                                                    {
+                                                        accessToken = token
+                                                        jwtPayloadString = AuthenticationManager.shared.extractJWTPayloadString(from: token) ?? "Unknown jwtPayloadString"
+                                                        loginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
+                                                        activeLogin = true
+                                                        revokeRequest = false
+                                                        AuthenticationManager.shared.checkOneDriveAccess(accessToken: token) { accessSuccess, accessError in
+                                                            DispatchQueue.main.async {
+                                                                if accessSuccess {
+                                                                    authManager.fileAccessResultOD = "Access to OneDrive granted."
+                                                                    AuthenticationManager.shared.fetchDirectoryContents(accessToken: token)
+                                                                    AuthenticationManager.shared.fetchSharedItems(accessToken: token)
+                                                                    
+                                                                } else {
+                                                                    authManager.fileAccessResult = accessError ?? "Access to OneDrive failed."
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        authManager.activeLogin = false
+                                                        authManager.fileAccessResult = "Silent token acquisition failed."
+                                                    }
+                                                }
                                             }
                                             else
                                             {
-                                                authManager.activeLogin = false
-                                                authManager.fileAccessResult = "Silent token acquisition failed."
+                                                activeLogin = false
+                                                // include code here to prmopt for offline login
+                                                
+                                                // 
                                             }
                                         }
                                     }
-                                    else
-                                    {
-                                        activeLogin = false
+                                    else {
+                                        print(loginID)
+                                        // run function to query database for email... if email found then:
+                                        activeLogin = true
                                     }
                                 }
+                                Toggle("Account Selection Prompt", isOn: $shouldPromptForAccount)
+                                    .fontDesign(.monospaced)
+                                    .font(.system(size: 18))
+                                    .textCase(.uppercase)
+                                    .bold()
                             }
-                            Toggle("Account Selection Prompt", isOn: $shouldPromptForAccount)
-                                .fontDesign(.monospaced)
-                                .font(.system(size: 18))
-                                .textCase(.uppercase)
-                                .bold()
+                            .fontDesign(.monospaced)
+                            .font(.system(size: 18))
+                            .textCase(.uppercase)
+                            .bold()
+                            .foregroundColor(Color(hex: "FF6600"))
+                            
+                            HStack {
+                                Toggle("Offline Login", isOn: $offlineLogin)
+                                    .fontDesign(.monospaced)
+                                    .font(.system(size: 18))
+                                    .textCase(.uppercase)
+                                    .bold()
+                            }
+                            .fontDesign(.monospaced)
+                            .font(.system(size: 18))
+                            .textCase(.uppercase)
+                            .bold()
+                            .foregroundColor(Color(hex: "FF6600"))
                         }
-                        .fontDesign(.monospaced)
-                        .font(.system(size: 18))
-                        .textCase(.uppercase)
-                        .bold()
-                        .foregroundColor(Color(hex: "FF6600"))
                     }
                 }
             }
         }
         .onAppear {
-            // instead of this code, check to see if there is an active login
+            print("Total employees: \(employees.count)")
+            for employee in employees {
+                print(employee.email ?? "No email")
+            }
+//            GLTFunctions.addEmployee(
+//                            nameFirst: "John",
+//                            nameLast: "Doe",
+//                            dob: "05/15/1990", // still a String
+//                            email: "john.doe@gmail.com",
+//                            phone: "(808) 555-1234",
+//                            streetAddress: "123 Aloha St",
+//                            city: "Honolulu",
+//                            state: "HI",
+//                            zipCode: "96815",
+//                            clearanceLevel: "SCI",
+//                            context: viewContext
+//                        )
             AuthenticationManager.shared.acquireTokenSilently { token, silentError in
                 if let token = token {
                     accessToken = token
                     jwtPayloadString = AuthenticationManager.shared.extractJWTPayloadString(from: token) ?? "Unkown jwtPayloadString in LoginView"
                     loginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown Login ID"
                     activeLogin = true
+                    print(loginID)
                     //extractedValue = "HELLOWWWWWW"
                 }
                 else
