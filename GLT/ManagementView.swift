@@ -22,7 +22,6 @@ struct ManagementView: View {
             HStack {
                 Button("\nEmployee \nManagement\n") {
                     let credCheck = GLTFunctions.fetchCredentials(requestType: "HRM", for: loginID!, in: viewContext)
-                    print(credCheck)
                     if credCheck {
                         showAlert = ""
                         path = NavigationPath()

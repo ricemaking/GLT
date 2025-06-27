@@ -264,7 +264,7 @@ struct ContentView: View
                                                 activeLogin = false
                                                 // include code here to prmopt for offline login
                                                 
-                                                // 
+                                                //
                                             }
                                         }
                                     }
@@ -308,19 +308,7 @@ struct ContentView: View
             for employee in employees {
                 print(employee.email ?? "No email")
             }
-//            GLTFunctions.addEmployee(
-//                            nameFirst: "John",
-//                            nameLast: "Doe",
-//                            dob: "05/15/1990", // still a String
-//                            email: "john.doe@gmail.com",
-//                            phone: "(808) 555-1234",
-//                            streetAddress: "123 Aloha St",
-//                            city: "Honolulu",
-//                            state: "HI",
-//                            zipCode: "96815",
-//                            clearanceLevel: "SCI",
-//                            context: viewContext
-//                        )
+            
             AuthenticationManager.shared.acquireTokenSilently { token, silentError in
                 if let token = token {
                     accessToken = token

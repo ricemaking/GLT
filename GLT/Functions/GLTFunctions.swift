@@ -228,9 +228,17 @@ public struct GLTFunctions {
     }
     //Function to get the credential levels of the employee
     public static func fetchCredentials(requestType: String, for employeeEmail: String, in context: NSManagedObjectContext) -> Bool {
+        
         if employeeEmail == "dylan@glintlock.com" {
             return true
         }
+        
+        // DEVELOPMENT PURPOSES (DELETE WHEN COMES TO ACTUAL CODE)
+        if employeeEmail == "john.doe@gmail.com" {
+            return true
+        }
+        //
+        
         else {
             let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "email == %@", employeeEmail)

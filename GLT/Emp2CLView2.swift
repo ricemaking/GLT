@@ -17,20 +17,21 @@ public struct Emp2CLView2: View {
     }
 
     public var body: some View {
-        List {
-            ForEach(cls.filter { $0.clName?.isEmpty == false }, id: \.self) { chargeLine in
-                let isSelected = selectedChargeLines[chargeLine.clID] ?? false
-                Button(action: {
-                    selectedChargeLines[chargeLine.clID] = !(selectedChargeLines[chargeLine.clID] ?? false)
-                }) {
-                    Text("\(chargeLine.clName ?? "No Name"), ID:\(String(format: "%05d", chargeLine.clID))")
-                        .padding()
-                        .foregroundColor(.white)
-                        .background(isSelected ? Color.blue : Color.gray)
-                        .cornerRadius(10)
+        VStack {
+            List {
+                ForEach(cls.filter { $0.clName?.isEmpty == false }, id: \.self) { chargeLine in
+                    let isSelected = selectedChargeLines[chargeLine.clID] ?? false
+                    Button(action: {
+                        selectedChargeLines[chargeLine.clID] = !(selectedChargeLines[chargeLine.clID] ?? false)
+                    }) {
+                        Text("\(chargeLine.clName ?? "No Name"), ID:\(String(format: "%05d", chargeLine.clID))")
+                            .padding()
+                            .foregroundColor(.white)
+                            .background(isSelected ? Color.blue : Color.gray)
+                            .cornerRadius(10)
+                    }
                 }
             }
-
             Button("Assign Selected") {
                 if selectedCount > 0 {
                     selectedChargeIDs = selectedChargeLines.filter { $0.value }.map { $0.key }

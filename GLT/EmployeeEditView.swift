@@ -82,11 +82,14 @@ struct EmployeeEditView: View {
                             TextField("Enter First Name", text: $nameFirst)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
+                        .frame(maxWidth: .infinity)
+                        
                         VStack(alignment: .leading) {
                             Text("Last Name")
                             TextField("Enter Last Name", text: $nameLast)
                                 .textFieldStyle(RoundedBorderTextFieldStyle())
                         }
+                        .frame(maxWidth: .infinity)
                     }
                     
                     VStack(alignment: .leading) {
@@ -182,7 +185,7 @@ struct EmployeeEditView: View {
                                 .blur(radius: 2)
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.black)
-                                .frame(width: 175, height: 40)
+                                .frame(maxWidth: .infinity)
                                 .blur(radius: 1)
                             Button(action: {
                                 hrBGColor = manager_HR ? Color(hex: "110000") : Color(hex: "FF0000")
@@ -198,7 +201,7 @@ struct EmployeeEditView: View {
                             }
                             .background(Color.clear)
                         }
-                        .frame(width: 180, height: 45)
+                        .frame(maxWidth: .infinity)
                         .padding()
                         
                         // Timecard Manager Button (using property manager_TimeCard)
@@ -208,7 +211,7 @@ struct EmployeeEditView: View {
                                 .blur(radius: 2)
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.black)
-                                .frame(width: 175, height: 40)
+                                .frame(maxWidth: .infinity)
                                 .blur(radius: 1)
                             Button(action: {
                                 tcBGColor = manager_TimeCard ? Color(hex: "110000") : Color(hex: "FF0000")
@@ -224,7 +227,7 @@ struct EmployeeEditView: View {
                             }
                             .background(Color.clear)
                         }
-                        .frame(width: 180, height: 45)
+                        .frame(maxWidth: .infinity)
                         .padding()
                     }
                     
@@ -235,7 +238,7 @@ struct EmployeeEditView: View {
                             .blur(radius: 2)
                         RoundedRectangle(cornerRadius: 20)
                             .fill(Color.black)
-                            .frame(width: 175, height: 40)
+                            .frame(maxWidth: .infinity)
                             .blur(radius: 0)
                         Button(action: {
                             clBGColor = manager_ChargeLine ? Color(hex: "110000") : Color(hex: "FF0000")
@@ -251,7 +254,7 @@ struct EmployeeEditView: View {
                         }
                         .background(Color.clear)
                     }
-                    .frame(width: 180, height: 45)
+                    .frame(maxWidth: .infinity)
                     .padding()
                 }
                 
@@ -284,6 +287,7 @@ struct EmployeeEditView: View {
             }
             .padding()
             .onAppear {
+                print("Edit Employee View")
                 fetchEmployeeData()
                 phone = formatPhoneNumber(phone)
             }

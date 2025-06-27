@@ -65,7 +65,7 @@ struct TimesheetListView: View {
             timesheets = try GLTFunctions.fetchFilteredTimesheets(
                 for: curEmployee,
                 sortKey: "enabled",
-                ascending: true,
+                ascending: false,
                 startMonth: Int16(GLTFunctions.fetchCurMonth()),
                 startYear: Int16(GLTFunctions.fetchCurYear()),
                 context: viewContext
@@ -118,6 +118,14 @@ struct TimesheetListView: View {
         if timesheets.isEmpty {
             if let newTimesheet = GLTFunctions.addTimesheet(byID: curEmployee, context: viewContext) {
                 timesheets.append(newTimesheet)
+            }
+        }
+        
+        timesheets.sort {
+            if $0.year == $1.year {
+                return $0.month > $1.month
+            } else {
+                return $0.year > $1.year
             }
         }
     }

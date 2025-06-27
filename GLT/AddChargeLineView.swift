@@ -44,7 +44,7 @@ struct AddChargeLineView: View {
             HStack {
                 VStack {
                     Text("Start Date")
-                    TextField("Enter Date Start (yyyy-MM-dd)", text: $clDateStart)
+                    TextField("(mm-dd-yyyy)", text: $clDateStart)
                         .padding()
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .onChange(of: clDateStart) {validateInputs() }
@@ -52,7 +52,7 @@ struct AddChargeLineView: View {
 
                 VStack {
                     Text("End Date")
-                    TextField("Enter Date End (yyyy-MM-dd)", text: $clDateEnd)
+                    TextField("(mm-dd-yyyy)", text: $clDateEnd)
                         .padding()
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .onChange(of: clDateEnd) {validateInputs() }

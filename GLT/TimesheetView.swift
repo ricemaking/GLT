@@ -38,6 +38,9 @@ struct TimesheetView: View {
                 Text("Current Timesheet ID: \(curTimesheet.id)")
                 Text("Days in Timesheet Month: \(GLTFunctions.numberOfDaysInCurrentMonth())")
             }
+            else {
+
+            }
             
             if let lastRun = previousRunTimestamp {
                 Text("Previous Run: \(lastRun, formatter: dateFormatter)")

@@ -227,7 +227,7 @@ struct AddEmployeeView: View {
                         placeholder: "mm/dd/yyyy",
                         keyboardType: .numberPad
                     )
-                    .frame(height: 40)
+                    .frame(maxWidth: .infinity)
                 }
                 
                 // End Date Field (optional)
@@ -243,7 +243,7 @@ struct AddEmployeeView: View {
                         placeholder: "mm/dd/yyyy",
                         keyboardType: .numberPad
                     )
-                    .frame(height: 40)
+                    .frame(maxWidth: .infinity)
                 }
                 
                 // MARK: Manager Role Buttons
@@ -256,7 +256,7 @@ struct AddEmployeeView: View {
                                 .blur(radius: 2)
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.black)
-                                .frame(width: 175, height: 40)
+                                .frame(maxWidth: .infinity)
                                 .blur(radius: 1)
                             Button(action: {
                                 hrBGColor = manager_HR ? Color(hex: "110000") : Color(hex: "FF0000")
@@ -272,7 +272,7 @@ struct AddEmployeeView: View {
                             }
                             .background(Color.clear)
                         }
-                        .frame(width: 180, height: 45)
+                        .frame(maxWidth: .infinity)
                         .padding()
                         
                         // Timecard Manager Button
@@ -282,7 +282,7 @@ struct AddEmployeeView: View {
                                 .blur(radius: 2)
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.black)
-                                .frame(width: 175, height: 40)
+                                .frame(maxWidth: .infinity)
                                 .blur(radius: 1)
                             Button(action: {
                                 tcBGColor = manager_TimeCard ? Color(hex: "110000") : Color(hex: "FF0000")
@@ -298,7 +298,7 @@ struct AddEmployeeView: View {
                             }
                             .background(Color.clear)
                         }
-                        .frame(width: 180, height: 45)
+                        .frame(maxWidth: .infinity)
                         .padding()
                     }
                     // Charge Line Manager Button
@@ -308,7 +308,7 @@ struct AddEmployeeView: View {
                             .blur(radius: 2)
                         RoundedRectangle(cornerRadius: 20)
                             .fill(Color.black)
-                            .frame(width: 175, height: 40)
+                            .frame(maxWidth: .infinity)
                             .blur(radius: 0)
                         Button(action: {
                             clBGColor = manager_ChargeLine ? Color(hex: "110000") : Color(hex: "FF0000")
@@ -324,7 +324,7 @@ struct AddEmployeeView: View {
                         }
                         .background(Color.clear)
                     }
-                    .frame(width: 180, height: 45)
+                    .frame(maxWidth: .infinity)
                     .padding()
                 }
                 
@@ -358,6 +358,7 @@ struct AddEmployeeView: View {
             }
             .padding()
             .onAppear {
+                print("Add Employee View")
                 // Format phone on load.
                 phone = formatPhoneNumber(phone)
             }
