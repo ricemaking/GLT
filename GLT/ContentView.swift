@@ -61,7 +61,7 @@ struct ContentView: View
     @State private var jwtPayloadString: String = ""
     @State private var extractedValue: String = ""
     @State private var revokeRequest: Bool = false
-    @State private var message: String = ""
+    @State private var message: String? = ""
 
 
 
@@ -76,13 +76,29 @@ struct ContentView: View
         NavigationStack(path: $path)
         {
             VStack {
-                if loginID != "" && activeLogin {
-                    Text("Welcome: \(loginID)")
+                
+                if let message = message, !message.isEmpty {
+                    Text(message)
+                        .foregroundColor(.red)
+                        .padding()
+                        .multilineTextAlignment(.center)
                 }
+                
+                if let login = loginID, !login.isEmpty, activeLogin {
+                    Text("Welcome: \(login)")
+                }
+                    
                 HStack {
                     Spacer()
                     Button("\nTimesheet     \n") {
-                        path.append(AppView.timesheet)
+                        if !activeLogin {
+                            message = "Not logged in"
+                        }
+                        else {
+                            message = ""
+                            path = NavigationPath()
+                            path.append(AppView.timesheet)
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     Spacer()
@@ -96,8 +112,14 @@ struct ContentView: View
                 }
                 Button("TS List")
                 {
-                    path = NavigationPath()
-                    path.append(AppView.timesheetList)
+                    if !activeLogin {
+                        message = "Not logged in"
+                    }
+                    else {
+                        message = ""
+                        path = NavigationPath()
+                        path.append(AppView.timesheetList)
+                    }
                 }
                 .buttonStyle(.borderedProminent)
 
@@ -109,7 +131,6 @@ struct ContentView: View
                     AuthenticationManager.shared.fetchSharePointContents()
                     os_log("Load SharePoint Contents button clicked.", log: OSLog.default, type: .debug)
                 }
-                Text(message)
                 Text("SITE ID is: \(authManager.siteID ?? "No result yet")")
                 ScrollView{
                     VStack{
