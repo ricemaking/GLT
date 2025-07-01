@@ -8,6 +8,8 @@ public struct Emp2CLView2: View {
     @Binding var selectedEmployeeIDs: [Int32]
     @State var selectedChargeLines: [Int32: Bool] = [:]
     @State var selectedChargeIDs: [Int32] = []
+    @State var confirmAssignment: Bool = false
+    @State var initChargeLines: [Int32: Bool] = [:]
 
     @FetchRequest(entity: Employee.entity(), sortDescriptors: []) var employees: FetchedResults<Employee>
     @FetchRequest(entity: ChargeLine.entity(), sortDescriptors: []) var cls: FetchedResults<ChargeLine>
@@ -16,13 +18,14 @@ public struct Emp2CLView2: View {
         selectedChargeLines.values.filter { $0 }.count
     }
 
+
     public var body: some View {
         VStack {
             List {
                 ForEach(cls.filter { $0.clName?.isEmpty == false }, id: \.self) { chargeLine in
                     let isSelected = selectedChargeLines[chargeLine.clID] ?? false
                     Button(action: {
-                        selectedChargeLines[chargeLine.clID] = !(selectedChargeLines[chargeLine.clID] ?? false)
+                        selectedChargeLines[chargeLine.clID] = !isSelected
                     }) {
                         Text("\(chargeLine.clName ?? "No Name"), ID:\(String(format: "%05d", chargeLine.clID))")
                             .padding()
@@ -33,15 +36,24 @@ public struct Emp2CLView2: View {
                 }
             }
             Button("Assign Selected") {
-                if selectedCount > 0 {
+                confirmAssignment = true
+            }
+            .alert("Confirm Assignment", isPresented: $confirmAssignment) {
+                Button("Cancel") {}
+                Button("Confirm") {
                     selectedChargeIDs = selectedChargeLines.filter { $0.value }.map { $0.key }
-                    for id in selectedChargeIDs {
+                    for chargeLine in cls {
+                        let isSelected = selectedChargeLines[chargeLine.clID] ?? false
                         for employeeID in selectedEmployeeIDs {
-                            if let employee = employees.first(where: { $0.id == employeeID }),
-                               let chargeLine = cls.first(where: { $0.clID == id }) {
-                                // Add employee to chargeLine
-                                chargeLine.addToEmployee(employee)
-                                employee.addToChargeLine(chargeLine)
+                            if let employee = employees.first(where: { $0.id == employeeID }) {
+                                print(isSelected)
+                                if isSelected {
+                                    chargeLine.addToEmployee(employee)
+                                    employee.addToChargeLine(chargeLine)
+                                } else {
+                                    chargeLine.removeFromEmployee(employee)
+                                    employee.removeFromChargeLine(chargeLine)
+                                }
                             }
                         }
                     }
@@ -49,17 +61,35 @@ public struct Emp2CLView2: View {
                         try managedObjectContext.save()
                     } catch {
                         print("Failed to save context: \(error)")
+
                     }
                     path = NavigationPath() // Reset the navigation path to go back
                     path.append(AppView.management)
                     path.append(AppView.emp2cl1)
                 }
+            } message: {
+                Text("Are you sure you want to apply these changes?")
             }
 
             if filteredEmployees.isEmpty {
                 Text("No employees selected")
                     .padding()
             }
+        }
+        .onAppear {
+            var initialSelection: [Int32: Bool] = [:]
+            var assignedIDs: Set<Int32> = []
+
+            for employeeID in selectedEmployeeIDs {
+                let chargeLineIDs = GLTFunctions.fetchChargeLineIDs(for: employeeID, in: managedObjectContext)
+                assignedIDs.formUnion(chargeLineIDs)
+            }
+
+            for chargeLine in cls {
+                initialSelection[chargeLine.clID] = assignedIDs.contains(chargeLine.clID)
+            }
+
+            selectedChargeLines = initialSelection
         }
     }
 
