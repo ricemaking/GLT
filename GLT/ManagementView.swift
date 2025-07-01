@@ -33,6 +33,8 @@ struct ManagementView: View {
                 }
                 .buttonStyle(BorderedProminentButtonStyle())
                 .padding()
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
                 Button("\nCharge Line \nManagement\n") {
                     let credCheck = GLTFunctions.fetchCredentials(requestType: "CLM", for: loginID!, in: viewContext)
                     if credCheck {
@@ -47,6 +49,8 @@ struct ManagementView: View {
                 }
                 .buttonStyle(BorderedProminentButtonStyle())
                 .padding()
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
             }
             HStack {
                 Button("\nAssign Employees \nto \nCharge Line \n") {
@@ -62,6 +66,8 @@ struct ManagementView: View {
                 }
                 .buttonStyle(BorderedProminentButtonStyle())
                 .padding()
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
                 Button("\nAssign Charge Lines \nto \nEmployee \n") {
                     let credCheck = GLTFunctions.fetchCredentials(requestType: "CLM", for: loginID!, in: viewContext)
                     if credCheck {
@@ -74,6 +80,8 @@ struct ManagementView: View {
                 }
                 .buttonStyle(BorderedProminentButtonStyle())
                 .padding()
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
             }
             Spacer()
         }
