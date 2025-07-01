@@ -39,7 +39,8 @@ struct TimesheetView: View {
                 Text("Days in Timesheet Month: \(GLTFunctions.numberOfDaysInCurrentMonth())")
             }
             else {
-
+                Text("Select a timesheet from your timesheet list")
+                    .foregroundStyle(.red)
             }
             
             if let lastRun = previousRunTimestamp {
