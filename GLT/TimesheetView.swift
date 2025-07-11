@@ -4,6 +4,10 @@
 //
 //  Created by Player_1 on [Date].
 //
+// hours charged to this line (make sure all the hours are being accounted for when removing  achargline)
+// make sure user can see how many hours they have in total, including the hours from the chargelines they were removedf from
+// theres a check in the tschargeline that checks the date and checks for a date disabled
+// user can edit hours prior to date disable, but from that point on date disabled they cant edit their hours
 
 import SwiftUI
 import CoreData
@@ -30,7 +34,7 @@ struct TimesheetView: View {
         formatter.dateFormat = "EEEE"
         return [formatter.weekdaySymbols[6], formatter.weekdaySymbols[0]]
     }
-
+    
     var body: some View {
         VStack {
             if let curTimesheet = curTimesheet {
@@ -108,13 +112,7 @@ struct TimesheetView: View {
     }
 
     private func setupView() {
-        guard let loginID = loginID,
-              let empID = GLTFunctions.fetchTarEmpID(byEmail: loginID, context: managedObjectContext)
-        else {
-            welcomeMessage = "Please log in first"
-            return
-        }
-
+        let empID = targetid
         employee = GLTFunctions.fetchTarEmp(byID: empID, context: managedObjectContext)
         chargeLines = GLTFunctions.fetchChargeLines(for: empID, in: managedObjectContext)
 

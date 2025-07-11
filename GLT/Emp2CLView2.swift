@@ -9,7 +9,7 @@ public struct Emp2CLView2: View {
     @State var selectedChargeLines: [Int32: Bool] = [:]
     @State var selectedChargeIDs: [Int32] = []
     @State var confirmAssignment: Bool = false
-    @State var initChargeLines: [Int32: Bool] = [:]
+    @State var initialSelection: [Int32: Bool] = [:]
 
     @FetchRequest(entity: Employee.entity(), sortDescriptors: []) var employees: FetchedResults<Employee>
     @FetchRequest(entity: ChargeLine.entity(), sortDescriptors: []) var cls: FetchedResults<ChargeLine>
@@ -46,13 +46,35 @@ public struct Emp2CLView2: View {
                         let isSelected = selectedChargeLines[chargeLine.clID] ?? false
                         for employeeID in selectedEmployeeIDs {
                             if let employee = employees.first(where: { $0.id == employeeID }) {
-                                print(isSelected)
                                 if isSelected {
                                     chargeLine.addToEmployee(employee)
                                     employee.addToChargeLine(chargeLine)
+                                    
+                                    GLTFunctions.assignTSChargeAssignmentDates(
+                                        employeeID: employeeID,
+                                        year: Int16(GLTFunctions.fetchCurMonth()),
+                                        month: Int16(GLTFunctions.fetchCurYear()),
+                                        day: Int16(GLTFunctions.fetchCurDay()),
+                                        clID: chargeLine.clID,
+                                        dateAssigned: Date(),
+                                        dateUnassigned: nil,
+                                        context: managedObjectContext
+                                    )
+                                    
                                 } else {
                                     chargeLine.removeFromEmployee(employee)
                                     employee.removeFromChargeLine(chargeLine)
+                                    
+                                    GLTFunctions.assignTSChargeAssignmentDates(
+                                        employeeID: employeeID,
+                                        year: Int16(GLTFunctions.fetchCurMonth()),
+                                        month: Int16(GLTFunctions.fetchCurYear()),
+                                        day: Int16(GLTFunctions.fetchCurDay()),
+                                        clID: chargeLine.clID,
+                                        dateAssigned: nil,
+                                        dateUnassigned: Date(),
+                                        context: managedObjectContext
+                                    )
                                 }
                             }
                         }
@@ -77,19 +99,7 @@ public struct Emp2CLView2: View {
             }
         }
         .onAppear {
-            var initialSelection: [Int32: Bool] = [:]
-            var assignedIDs: Set<Int32> = []
-
-            for employeeID in selectedEmployeeIDs {
-                let chargeLineIDs = GLTFunctions.fetchChargeLineIDs(for: employeeID, in: managedObjectContext)
-                assignedIDs.formUnion(chargeLineIDs)
-            }
-
-            for chargeLine in cls {
-                initialSelection[chargeLine.clID] = assignedIDs.contains(chargeLine.clID)
-            }
-
-            selectedChargeLines = initialSelection
+            initSelections()
         }
     }
 
@@ -97,5 +107,24 @@ public struct Emp2CLView2: View {
         employees.filter { employee in
             selectedEmployeeIDs.contains(employee.id)
         }
+    }
+    
+    private func initSelections() {
+        var assignedIDs: Set<Int32> = []
+
+        for employeeID in selectedEmployeeIDs {
+            let chargeLineIDs = GLTFunctions.fetchChargeLineIDs(for: employeeID, in: managedObjectContext)
+            assignedIDs.formUnion(chargeLineIDs)
+        }
+
+        for chargeLine in cls {
+            initialSelection[chargeLine.clID] = assignedIDs.contains(chargeLine.clID)
+        }
+
+        selectedChargeLines = initialSelection
+    }
+    
+    private func generateChangeLog() {
+        var returnString = "Are you sure you want to apply the following changes?"
     }
 }

@@ -20,6 +20,8 @@ enum AppView: Hashable {
     case timesheet
     case timesheetList
     case loginView
+    case manageEmpTimesheet
+    case manageEmpTimesheetList
     //case cl2emp1
     //case cl2emp2
 }
@@ -204,6 +206,10 @@ struct ContentView: View
                     TimesheetListView(path: $path, curEmployee: $targetid, curTimesheet: $curTimesheet, loginID: $loginID)
                 case .loginView:
                     LoginView(path: $path, loginID: $loginID, activeLogin: $activeLogin, jwtPayloadString: $jwtPayloadString, extractedValue: $extractedValue, shouldPromptForAccount: $shouldPromptForAccount)
+                case .manageEmpTimesheet:
+                    ManageEmpTimesheet(path: $path, curEmployee: $targetid, loginID: $loginID, curTimesheet: $curTimesheet)
+                case .manageEmpTimesheetList:
+                    TimesheetListView(path: $path, curEmployee: $targetid, curTimesheet: $curTimesheet, loginID: $loginID, isManagingOthers: true)
                 }
             }
             .toolbar {
@@ -291,7 +297,6 @@ struct ContentView: View
                                     }
                                     else {
                                         print(loginID)
-                                        // run function to query database for email... if email found then:
                                         activeLogin = true
                                     }
                                 }

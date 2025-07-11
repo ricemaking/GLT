@@ -83,6 +83,23 @@ struct ManagementView: View {
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
             }
+            HStack {
+                Button("View Employee\nTimesheets") {
+                    let credCheck = GLTFunctions.fetchCredentials(requestType: "TSM", for: loginID!, in: viewContext)
+                    if credCheck {
+                        showAlert = ""
+                        path = NavigationPath()
+                        path.append(AppView.management)
+                        path.append(AppView.manageEmpTimesheet)
+                    } else {
+                        showAlert = "Brah, you fo real?  \nYou no have access to Dakine hea - K! 🤙🏽"
+                    }
+                }
+                .buttonStyle(BorderedProminentButtonStyle())
+                .padding()
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
+            }
             Spacer()
         }
     }

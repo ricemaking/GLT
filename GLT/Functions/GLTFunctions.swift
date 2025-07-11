@@ -10,7 +10,7 @@ import CoreData
 import SwiftUI
 
 public struct GLTFunctions {
-   
+    
     // Function to add a new employee
     public static func addEmployee(nameFirst: String, nameLast: String, dob: String, endDate: Date? = nil, email: String, phone: String, streetAddress: String, city: String, state: String, startDate: Date? = Date(), zipCode: String, clearanceLevel: String, context: NSManagedObjectContext){
         let newEmployee = Employee(context: context)
@@ -132,7 +132,7 @@ public struct GLTFunctions {
     public static func convertStr2Date(inputString: String) -> Date? {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-
+        
         // Try different formats
         let formats = ["dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy"]
         for format in formats {
@@ -144,21 +144,21 @@ public struct GLTFunctions {
         print("Invalid date format")
         return nil
     }
-
-
-
+    
+    
+    
     // Function to get the days in a month and weekday names
     static func dayName(year: Int, month: Int) -> [(day: Int, weekday: String)] {
         var daysAndWeekdays: [(Int, String)] = []
         let calendar = Calendar.current
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "EEEE" // Full name of the day
-
+        
         var dateComponents = DateComponents()
         dateComponents.year = year
         dateComponents.month = month
         dateComponents.day = 1
-
+        
         if let startDate = calendar.date(from: dateComponents) {
             if let range = calendar.range(of: .day, in: .month, for: startDate) {
                 for day in range {
@@ -182,7 +182,7 @@ public struct GLTFunctions {
     public static func fetchChargeLines(for employeeID: Int32, in context: NSManagedObjectContext) -> [String] {
         let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %d", employeeID) // Match Employee by ID
-
+        
         do {
             if let employee = try context.fetch(fetchRequest).first {
                 if let chargeLines = employee.chargeLine as? Set<ChargeLine> {
@@ -198,7 +198,7 @@ public struct GLTFunctions {
     public static func fetchChargeLineIDs(for employeeID: Int32, in context: NSManagedObjectContext) -> [Int32] {
         let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %d", employeeID) // Match Employee by ID
-
+        
         do {
             if let employee = try context.fetch(fetchRequest).first {
                 if let chargeLines = employee.chargeLine as? Set<ChargeLine> {
@@ -214,7 +214,7 @@ public struct GLTFunctions {
     public static func fetchChargeLines(for employeeID: Int32, in context: NSManagedObjectContext) -> [ChargeLine] {
         let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
         fetchRequest.predicate = NSPredicate(format: "id == %d", employeeID) // Match Employee by ID
-
+        
         do {
             if let employee = try context.fetch(fetchRequest).first {
                 if let chargeLines = employee.chargeLine as? Set<ChargeLine> {
@@ -276,7 +276,7 @@ public struct GLTFunctions {
         return currentMonth
     }
     //Function to fetch the current timesheet, using an employee ID passed, the current date, and the context.  If the current timesheet does not exist, one will be created
-
+    
     public static func fetchCurTimesheet(empID: Int32, context: NSManagedObjectContext) -> Timesheet? {
         let curDate: Date = Date()
         //let firstOfMonth: Date = GLTFunctions.firstDateOfCurrentMonth(from: curDate)!
@@ -306,10 +306,10 @@ public struct GLTFunctions {
                 return timesheet
             }
         }
-         catch {
-             return nil
-             //return timesheet
-         }
+        catch {
+            return nil
+            //return timesheet
+        }
         return nil
     }
     
@@ -320,6 +320,14 @@ public struct GLTFunctions {
         let currentYear = calendar.component(.year, from: currentDate) // Step 2: Extract month
         print("Current year: \(currentYear)") // This will print the current month as an integer (1-12)
         return currentYear
+    }
+    
+    public static func fetchCurDay() -> Int {
+        let currentDate = Date()
+        let calendar = Calendar.current
+        let currentDay = calendar.component(.day, from: currentDate)
+        print("Current day: \(currentDay)")
+        return currentDay
     }
     
     
@@ -725,5 +733,37 @@ public struct GLTFunctions {
     // Function to validate input
     public static func validateInput(_ input: String) -> Bool {
         return Int16(input) != nil
+    }
+    
+    public static func assignTSChargeAssignmentDates(
+        employeeID: Int32,
+        year: Int16,
+        month: Int16,
+        day: Int16,
+        clID: Int32,
+        dateAssigned: Date?,
+        dateUnassigned: Date?,
+        context: NSManagedObjectContext
+    ) {
+        if let tsCharge = fetchTarTSCharge(
+            byEmployeeID: employeeID,
+            year: year,
+            month: month,
+            day: day,
+            clID: clID,
+            context: context
+        ) {
+            tsCharge.dateAssigned = dateAssigned
+            tsCharge.dateUnassigned = dateUnassigned
+        }
+        do {
+            try context.save()
+            print(dateAssigned, dateUnassigned)
+            NSLog("Successfully assigned assignment date to TSCharge: %d, under employee %d", clID, employeeID)
+        }
+        catch {
+            print(dateAssigned, dateUnassigned)
+            NSLog("Error occured trying to assign assignment date to TSCharge: %d, under employee %d", clID, employeeID)
+        }
     }
 }

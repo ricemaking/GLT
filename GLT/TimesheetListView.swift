@@ -7,6 +7,8 @@ struct TimesheetListView: View {
     @Binding var curEmployee: Int32
     @Binding var curTimesheet: Timesheet?
     @Binding var loginID: String?
+    var isManagingOthers: Bool = false
+    
     @State private var curDate = Date()
     @State private var startDate: Date?
     @State private var firstOfMonthDate = GLTFunctions.firstDateOfCurrentMonth(from: Date())
@@ -14,6 +16,7 @@ struct TimesheetListView: View {
     @State private var timesheets: [Timesheet] = [] // Fixed initialization
     @State private var noTimesheets: Bool = false
     @State private var welcomeMessage: String = ""
+    
     
     var body: some View {
         VStack {
@@ -47,16 +50,24 @@ struct TimesheetListView: View {
                 }
         }
         .onAppear {
-            if let empEmail = loginID {
+            if isManagingOthers {
+                if let employee = GLTFunctions.fetchTarEmp(byID: curEmployee, context: viewContext) {
+                    let first = employee.nameFirst ?? "Unknown"
+                    let last  = employee.nameLast  ?? ""
+                    welcomeMessage = "Managing timesheets for: \(first) \(last)"
+                } else {
+                    welcomeMessage = "Managing timesheets for Employee #\(curEmployee)"
+                }
+                fetchTimesheets()
+            } else if let empEmail = loginID {
                 curEmployee = GLTFunctions.fetchTarEmpID(byEmail: empEmail, context: viewContext)!
-                //startDate = GLTFunctions.fetchEMPFirstTSDate(empID: curEmployee, empContext: viewContext)
                 fetchTimesheets()
                 welcomeMessage = "Timesheets for \(loginID!)"
-            }
-            else {
+            } else {
                 welcomeMessage = "🥷Please log in first🥷"
             }
         }
+
     }
     
     func fetchTimesheets() {

@@ -41,6 +41,7 @@ public struct Emp2CLView1: View {
                     path.append(AppView.emp2cl2)
                 }
             }
+            .disabled(selectedCount == 0)
         }
     }
 }

@@ -10,6 +10,7 @@ import CoreData
 
 struct ChargeLineRow: View {
     // MARK: - Input Properties
+    @Environment(\.managedObjectContext) var managedObjectContext
     @Binding var chargeLine: ChargeLine
     var day: (day: Int, weekday: String)
     var curID: Int32
@@ -25,7 +26,44 @@ struct ChargeLineRow: View {
     @State private var hoursColumnWidth: CGFloat = 50
     @State private var noteColumnWidth: CGFloat = 50
 
-    // Custom initializer to set up the view model.
+    // MARK: - Computed properties
+
+    private var assignmentWindow: (assigned: Date?, unassigned: Date?) {
+        let tsCharge = viewModel.fetchTSCharge()
+        print("ts charge:", tsCharge)
+        return (tsCharge?.dateAssigned, tsCharge?.dateUnassigned)
+    }
+
+    private var isDisabled: Bool {
+        guard let cellDate = Calendar.current.date(from: DateComponents(year: Int(year), month: Int(month), day: day.day)) else {
+            return false
+        }
+        let (assigned, unassigned) = assignmentWindow
+        
+//        print("celldate:", cellDate)
+//        print("assignment window:", assignmentWindow)
+
+        if let assigned = assigned, cellDate < assigned {
+            return true
+        }
+        if let unassigned = unassigned, cellDate > unassigned {
+            return true
+        }
+        return false
+    }
+
+    private var effectiveTextColor: UIColor {
+        isDisabled ? UIColor.gray : viewModel.currentColor
+    }
+
+    private var effectiveNotesButtonColor: Color {
+        if isDisabled {
+            return Color.gray
+        }
+        return notesButtonColor
+    }
+
+    // MARK: - Custom initializer
     init(chargeLine: Binding<ChargeLine>,
          day: (day: Int, weekday: String),
          curID: Int32,
@@ -46,7 +84,7 @@ struct ChargeLineRow: View {
             year: year,
             context: context))
     }
-    
+
     // MARK: - View Body
     var body: some View {
         ZStack {
@@ -66,10 +104,10 @@ struct ChargeLineRow: View {
                                 .preference(key: ChargeLineNameWidthKey.self, value: proxy.size.width)
                         }
                     )
-                
+
                 // Layout for input controls.
                 HStack {
-                    // Hours text field on the left.
+                    // Hours text field
                     AutoHighlightTextField(
                         text: Binding(
                             get: {
@@ -89,16 +127,17 @@ struct ChargeLineRow: View {
                         ),
                         placeholder: "Hours",
                         keyboardType: .decimalPad,
-                        textColor: viewModel.currentColor,
+                        textColor: effectiveTextColor,
                         onEditingChanged: { editing in
                             isEditingHours = editing
                         }
                     )
+                    .disabled(isDisabled)
                     .frame(width: hoursColumnWidth, height: 35)
-                    
+
                     Spacer()
-                    
-                    // Note button on the right.
+
+                    // Notes button
                     Button(action: {
                         viewModel.handleNotesButtonPress { tsCharge in
                             selectedTSCharge = tsCharge
@@ -109,9 +148,10 @@ struct ChargeLineRow: View {
                             .font(.system(size: 18))
                             .padding(4)
                             .foregroundColor(.white)
-                            .background(notesButtonColor)
+                            .background(effectiveNotesButtonColor)
                             .cornerRadius(4)
                     }
+                    .disabled(isDisabled)
                     .frame(width: max(noteColumnWidth, 44), height: 40, alignment: .trailing)
                     .overlay(
                         GeometryReader { geometry in
@@ -124,7 +164,7 @@ struct ChargeLineRow: View {
                     }
                 }
                 .padding(.horizontal, 12)
-                
+
                 Text("Total: \(viewModel.totalHours(), specifier: "%.2f") hours")
                     .font(.caption)
                     .foregroundColor(Color.secondary)
@@ -132,12 +172,8 @@ struct ChargeLineRow: View {
             .padding(4)
             .contentShape(Rectangle())
         }
-        .onTapGesture {
-            hideKeyboard()
-        }
-        .onAppear {
-            viewModel.updateCurrentColor()
-        }
+        .onTapGesture { hideKeyboard() }
+        .onAppear { viewModel.updateCurrentColor() }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.NSManagedObjectContextObjectsDidChange)) { _ in
             if !isEditingHours {
                 viewModel.updateCurrentColor()
@@ -147,14 +183,14 @@ struct ChargeLineRow: View {
             DragGesture(minimumDistance: 0)
                 .onEnded { _ in hideKeyboard() }
         )
-        // Present a sheet using your existing ChargeNoteDetailView.
         .sheet(isPresented: $showingNotesSheet) {
             if let tsCharge = selectedTSCharge {
                 ChargeNoteDetailView(tsCharge: tsCharge, context: context)
             }
         }
     }
-    
+
+    // MARK: - Helpers
     private var notesButtonColor: Color {
         if let tsCharge = viewModel.fetchTSCharge() {
             return tsCharge.noted ? .blue : Color(hex: "8c3731")

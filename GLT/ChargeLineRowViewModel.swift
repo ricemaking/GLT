@@ -151,4 +151,17 @@ class ChargeLineRowViewModel: ObservableObject {
             }
         }
     }
+    
+    var assignmentWindow: (assigned: Date?, unassigned: Date?) {
+        let tsCharge = GLTFunctions.fetchTarTSCharge(
+            byEmployeeID: curID,
+            year: year,
+            month: month,
+            day: Int16(day),
+            clID: chargeLine.clID,
+            context: context
+        )
+        return (tsCharge?.dateAssigned, tsCharge?.dateUnassigned)
+        
+    }
 }
