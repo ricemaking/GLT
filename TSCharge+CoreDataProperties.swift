@@ -35,6 +35,8 @@ extension TSCharge {
     @NSManaged public var chargeLine: ChargeLine?
     @NSManaged public var employee: Employee?
     @NSManaged public var timesheet: Timesheet?
+    @NSManaged public var offline: Bool
+
 
 }
 
