@@ -67,7 +67,6 @@ struct ContentView: View
 
 
 
-
     @FetchRequest(
         sortDescriptors: []
     ) var employees: FetchedResults<Employee>
@@ -201,7 +200,7 @@ struct ContentView: View
                 case .empDetail:
                     EmployeeDetailsView(path: $path, targetid: $targetid)
                 case .timesheet:
-                    TimesheetView(path: $path, loginID: $loginID, curTimesheet: $curTimesheet, targetid: $targetid, timesheet: $timesheet, previousRunTimestamp: $previousRunTimestamp)
+                    TimesheetView(offlineLogin: $offlineLogin, path: $path, loginID: $loginID, curTimesheet: $curTimesheet, targetid: $targetid, timesheet: $timesheet, previousRunTimestamp: $previousRunTimestamp)
                 case .timesheetList:
                     TimesheetListView(path: $path, curEmployee: $targetid, curTimesheet: $curTimesheet, loginID: $loginID)
                 case .loginView:
