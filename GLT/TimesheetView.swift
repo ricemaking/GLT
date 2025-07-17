@@ -4,10 +4,6 @@
 //
 //  Created by Player_1 on [Date].
 //
-// hours charged to this line (make sure all the hours are being accounted for when removing  achargline)
-// make sure user can see how many hours they have in total, including the hours from the chargelines they were removedf from
-// theres a check in the tschargeline that checks the date and checks for a date disabled
-// user can edit hours prior to date disable, but from that point on date disabled they cant edit their hours
 
 import SwiftUI
 import CoreData
@@ -17,13 +13,13 @@ func hasInternetConnection() -> Bool {
     config.timeoutIntervalForRequest = 5
     let session = URLSession(configuration: config)
     let url = URL(string: "https://www.apple.com")!
-    
+
     var request = URLRequest(url: url)
     request.httpMethod = "HEAD"
-    
+
     let semaphore = DispatchSemaphore(value: 0)
     var reachable = false
-    
+
     let task = session.dataTask(with: request) { _, response, error in
         if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
             reachable = true
@@ -32,14 +28,14 @@ func hasInternetConnection() -> Bool {
     }
     task.resume()
     _ = semaphore.wait(timeout: .now() + 5)
-    
+
     return reachable
 }
 
 struct DayChargeKey: Hashable, Comparable {
     let day: Int
     let chargeID: Int
-    
+
     // For sorting
     static func < (lhs: DayChargeKey, rhs: DayChargeKey) -> Bool {
         if lhs.day != rhs.day {
@@ -62,7 +58,7 @@ struct TimesheetView: View {
     @Binding var targetid: Int32
     @Binding var timesheet: Timesheet?
     @Binding var previousRunTimestamp: Date?
-    
+
     @State private var employee: Employee?
     @State private var chargeLines: [ChargeLine] = []
     @State private var welcomeMessage: String = ""
@@ -78,9 +74,9 @@ struct TimesheetView: View {
     @State private var jwtPayloadString: String = ""
     @State private var activeLogin: Bool = false
     @StateObject var authManager = AuthenticationManager.shared
-    
-    
-    
+
+
+
     var weekends: [String] {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE"
@@ -100,19 +96,15 @@ struct TimesheetView: View {
         formatter.timeStyle = .none
         return formatter
     }()
-    
-    
+
+
     
     var body: some View {
         VStack {
             if let curTimesheet = curTimesheet {
-                Text("Timesheet for: \(GLTFunctions.convertIntToMonth(from: Int(curTimesheet.month))), \(curTimesheet.year)")
+                Text("Timesheet for: \(GLTFunctions.convertIntToMonth(from: Int(curTimesheet.month))), \(Int(curTimesheet.year))")
                 Text("Current Timesheet ID: \(curTimesheet.id)")
                 Text("Days in Timesheet Month: \(GLTFunctions.numberOfDaysInCurrentMonth())")
-            }
-            else {
-                Text("Select a timesheet from your timesheet list")
-                    .foregroundStyle(.red)
             }
             
             if let lastRun = previousRunTimestamp {
@@ -123,18 +115,11 @@ struct TimesheetView: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: 16) {  // Spacing between day columns.
                         ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
-//                            let assignedCLs = GLTFunctions.fetchAssignedOrHasHoursChargeLines(
-//                                for: targetid ?? 0,
-//                                month: month,
-//                                year: year,
-//                                context: managedObjectContext
-//                            )
-                                                        
                             DayView(
                                 day: day,
                                 month: month,
                                 year: year,
-                                curID: targetid ?? 0,  // Use the employee id if available.
+                                curID: employee?.id ?? 0,  // Use the employee id if available.
                                 chargeLines: $chargeLines,
                                 weekends: weekends,
                                 context: managedObjectContext,
@@ -176,43 +161,43 @@ struct TimesheetView: View {
             }
             .padding(.vertical, 8)
             /*
-             if !pendingOfflineTSCharges.isEmpty {
-             Text("Offline Changes Detected")
-             .font(.headline)
-             
-             List {
-             ForEach(pendingOfflineTSCharges, id: \.objectID) { charge in
-             VStack(alignment: .leading) {
-             Text("Date: \(charge.month)/\(charge.day)/\(charge.year)")
-             Text("Hours: \(charge.hours)")
-             Text("Charge ID: \(charge.chargeID)")
-             Text("Version:  \(charge.version)")
-             }
-             }
-             }
-             */
-            
-            //}
-            
-            
-            
             if !pendingOfflineTSCharges.isEmpty {
                 Text("Offline Changes Detected")
                     .font(.headline)
+
+                List {
+                    ForEach(pendingOfflineTSCharges, id: \.objectID) { charge in
+                        VStack(alignment: .leading) {
+                            Text("Date: \(charge.month)/\(charge.day)/\(charge.year)")
+                            Text("Hours: \(charge.hours)")
+                            Text("Charge ID: \(charge.chargeID)")
+                            Text("Version:  \(charge.version)")
+                        }
+                    }
+                }
+*/
                 
+            //}
+             
+            
+
+            if !pendingOfflineTSCharges.isEmpty {
+                Text("Offline Changes Detected")
+                    .font(.headline)
+
                 OfflineChangesTabView(sortedKeys: sortedKeys, groupedCharges: groupedCharges)
                 HStack {
                     Button("Approve") {
-                        authenticateAndApproveChanges()
-                        //approveOfflineCharges()
+                        //authenticateAndApproveChanges()
+                        approveOfflineCharges()
                     }
                     .padding()
                     .background(Color.green)
                     .foregroundColor(.white)
                     .cornerRadius(8)
-                    
+
                     Button("Deny") {
-                        pendingOfflineTSCharges.removeAll()
+                        denyOfflineCharges()
                     }
                     .padding()
                     .background(Color.red)
@@ -230,18 +215,18 @@ struct TimesheetView: View {
             }
         }
     }
-    
+
     private func setupView() {
-        let empID = targetid
+        guard let loginID = loginID,
+              let empID = GLTFunctions.fetchTarEmpID(byEmail: loginID, context: managedObjectContext)
+        else {
+            welcomeMessage = "Please log in first"
+            return
+        }
+
         employee = GLTFunctions.fetchTarEmp(byID: empID, context: managedObjectContext)
-//        chargeLines = GLTFunctions.fetchAssignedOrHasHoursChargeLines(
-//            for: empID,
-//            month: month,
-//            year: year,
-//            context: managedObjectContext
-//        )
         chargeLines = GLTFunctions.fetchChargeLines(for: empID, in: managedObjectContext)
-        
+
         if let cur = curTimesheet {
             month = Int16(cur.month)
             year = Int16(cur.year)
@@ -250,17 +235,16 @@ struct TimesheetView: View {
             welcomeMessage = "Error: Timesheet data unavailable"
         }
     }
-    
+
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .medium
         return formatter
     }
-
     
     // MARK: - Save and Submit Functions
-    
+
     private func saveAllChargeLines() {
         if hasInternetConnection() && offlineLogin == false{
             managedObjectContext.perform {
@@ -290,6 +274,7 @@ struct TimesheetView: View {
                             newTSCharge.hours = tsCharge.tempHours
                             newTSCharge.version = tsCharge.version + 1
                             newTSCharge.offline = false
+                            newTSCharge.verified = true
                             print("created new online tsCharge, version: \(newTSCharge.version)")
                             do {
                                 try managedObjectContext.save()
@@ -309,62 +294,64 @@ struct TimesheetView: View {
         else if !hasInternetConnection()/* && offlineLogin == true*/{
             offlineLogin=true
             print("offline login true, no internet connection")
-            managedObjectContext.perform {
-                let currentEmpID = employee?.id ?? 0
-                let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
-                fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO", currentEmpID, month, year)
-                
-                do {
-                    let tsCharges = try managedObjectContext.fetch(fetchRequest) //fetch all unsaved tscharges
-                    
-                    for tsCharge in tsCharges {
-                        if let tempHours = tsCharge.tempHours, tsCharge.tempHours != tsCharge.hours{
-                            tsCharge.hours = tempHours
-                            //tsCharge.tempHours = nil
-                            tsCharge.saved = true
-                            tsCharge.dateSaved = Date()
-                            tsCharge.offline = true
-                            print("marked tsCharge as saved offline, version: \(tsCharge.version)")
-                            //version?
-                            let newTSCharge = TSCharge(context: managedObjectContext)
-                            newTSCharge.employeeID = tsCharge.employeeID
-                            newTSCharge.chargeID = tsCharge.chargeID
-                            newTSCharge.month = tsCharge.month
-                            newTSCharge.year = tsCharge.year
-                            newTSCharge.day = tsCharge.day
-                            newTSCharge.tempHours = tsCharge.tempHours
-                            newTSCharge.saved = false
-                            newTSCharge.hours = tsCharge.tempHours
-                            newTSCharge.version = tsCharge.version + 1
-                            newTSCharge.offline = true
-                            print("created new (offline) tsCharge, version: \(newTSCharge.version)")
-                            do {
-                                try managedObjectContext.save()
-                            } catch {
-                                print("Error saving new TSCharge: \(error.localizedDescription)")
-                            }
-                        }
-                    }
-                    try managedObjectContext.save()
-                    managedObjectContext.refreshAllObjects()
-                    NSLog("Successfully saved all TSCharge hours, marking them as saved.")
-                } catch {
-                    NSLog("Error saving TSCharge: \(error.localizedDescription)")
-                }
-            }
+             managedObjectContext.perform {
+                 let currentEmpID = employee?.id ?? 0
+                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+                 fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO AND denied == NO", currentEmpID, month, year)
+                 print("fetched charges")
+                 do {
+                     let tsCharges = try managedObjectContext.fetch(fetchRequest) //fetch all unsaved tscharges
+                     
+                     for tsCharge in tsCharges {
+                         if let tempHours = tsCharge.tempHours, tsCharge.tempHours != tsCharge.hours{
+                             tsCharge.hours = tempHours
+                             //tsCharge.tempHours = nil
+                             tsCharge.saved = true
+                             tsCharge.dateSaved = Date()
+                             tsCharge.offline = true
+                             print("marked tsCharge as saved offline, version: \(tsCharge.version)")
+                             //version?
+                             let newTSCharge = TSCharge(context: managedObjectContext)
+                             newTSCharge.employeeID = tsCharge.employeeID
+                             newTSCharge.chargeID = tsCharge.chargeID
+                             newTSCharge.month = tsCharge.month
+                             newTSCharge.year = tsCharge.year
+                             newTSCharge.day = tsCharge.day
+                             newTSCharge.tempHours = tsCharge.tempHours
+                             newTSCharge.saved = false
+                             newTSCharge.hours = tsCharge.tempHours
+                             newTSCharge.version = tsCharge.version + 1
+                             newTSCharge.offline = true
+                             newTSCharge.denied = false
+                             newTSCharge.verified = false
+                             print("created new (offline) tsCharge, version: \(newTSCharge.version)")
+                             do {
+                                 try managedObjectContext.save()
+                             } catch {
+                                 print("Error saving new TSCharge: \(error.localizedDescription)")
+                             }
+                         }
+                     }
+                     try managedObjectContext.save()
+                     managedObjectContext.refreshAllObjects()
+                     NSLog("Successfully saved all TSCharge hours, marking them as saved.")
+                 } catch {
+                     NSLog("Error saving TSCharge: \(error.localizedDescription)")
+                 }
+             }
         }
         else if hasInternetConnection() && offlineLogin == true{
             managedObjectContext.perform {
                 let currentEmpID = employee?.id ?? 0
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
-                fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND offline==YES AND saved==YES", currentEmpID)
+                fetchRequest.predicate = NSPredicate(format: "employeeID==%d AND offline==YES AND saved==YES AND verified == NO", currentEmpID)
                 fetchRequest.sortDescriptors = [
                     NSSortDescriptor(key: "day", ascending: true),
                     NSSortDescriptor(key: "chargeID", ascending: true),
                     NSSortDescriptor(key: "version", ascending: true)
                 ]
-                
-                
+
+                        
                 do {
                     let tsCharges = try managedObjectContext.fetch(fetchRequest) //fetch all unsaved tscharges
                     DispatchQueue.main.async {
@@ -375,7 +362,7 @@ struct TimesheetView: View {
                     NSLog("Error fetching all offline TSCharges.")
                 }
             }
-            
+                     
             //display changes
             //get verification
             //change all changes from offline=true to offline=false
@@ -449,11 +436,13 @@ struct TimesheetView: View {
             }
         }
     }
-    
+
     private func approveOfflineCharges() {
         managedObjectContext.perform {
             for charge in pendingOfflineTSCharges {
                 charge.offline = false
+                charge.verified = true
+                print("approved day \(charge.day): \(charge.hours ?? 0) hours, \(charge.tempHours ?? 0) tempHours, offline: \(charge.offline), verified: \(charge.verified), denied: \(charge.denied), saved: \(charge.saved)")
             }
             do {
                 try managedObjectContext.save()
@@ -467,17 +456,72 @@ struct TimesheetView: View {
         }
     }
     
+    private func denyOfflineCharges() {
+        managedObjectContext.perform {
+            for charge in pendingOfflineTSCharges {
+                
+                let tempFetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+                tempFetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND day == %d AND chargeID == %d AND saved == NO", charge.employeeID, charge.month, charge.year, charge.day, charge.chargeID)
+                tempFetchRequest.sortDescriptors = [NSSortDescriptor(key: "version", ascending: false)]
+                tempFetchRequest.fetchLimit = 1
+                
+                let approvedFetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+                approvedFetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND day == %d AND chargeID == %d AND saved == YES AND ((offline == NO AND verified == YES AND denied == NO))", charge.employeeID, charge.month, charge.year, charge.day, charge.chargeID)
+                approvedFetchRequest.sortDescriptors = [NSSortDescriptor(key: "version", ascending: false)]
+                approvedFetchRequest.fetchLimit = 1
+                
+                /*OR (offline == YES AND verified == NO AND denied == NO)*/
+                    
+                do{
+                    if let tempTSCharge = try managedObjectContext.fetch(tempFetchRequest).first,
+                       let approvedTSCharge = try managedObjectContext.fetch(approvedFetchRequest).first {
+                        
+                        print("approved charge day \(approvedTSCharge.day): \(approvedTSCharge.hours ?? 0) hours, \(approvedTSCharge.tempHours ?? 0) tempHours, offline: \(approvedTSCharge.offline), verified: \(approvedTSCharge.verified), denied: \(approvedTSCharge.denied), saved: \(approvedTSCharge.saved), version: \(approvedTSCharge.version)")
+                        
+                        
+                        tempTSCharge.hours = approvedTSCharge.tempHours
+                        tempTSCharge.tempHours = approvedTSCharge.tempHours
+                        print("updated temp charge day \(tempTSCharge.day): \(tempTSCharge.hours ?? 0) hours, \(tempTSCharge.tempHours ?? 0) tempHours, offline: \(tempTSCharge.offline), verified: \(tempTSCharge.verified), denied: \(tempTSCharge.denied), saved: \(tempTSCharge.saved), version: \(tempTSCharge.version)")
+                        
+                    }
+
+                    charge.denied = true
+                    charge.offline=false
+                    charge.verified = true
+                    print("Denied version: \(charge.version) for chargeID: \(charge.chargeID) day: \(charge.day)")
+                    
+                    NSLog("Updated tempCharge")
+
+                }
+                catch{
+                    NSLog("Error updating tempCharge: \(error.localizedDescription)")
+                }
+            }
+            do {
+                try managedObjectContext.save()
+                DispatchQueue.main.async {
+                    pendingOfflineTSCharges.removeAll()
+                }
+                NSLog("Denied all offline TSCharges.")
+            }
+            catch {
+                NSLog("Error denying charges: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+
 }
 
 struct OfflineChangesTabView: View {
     let sortedKeys: [DayChargeKey]
     let groupedCharges: [DayChargeKey: [TSCharge]]
-    
+
     var body: some View {
         TabView {
             ForEach(sortedKeys, id: \.self) { key in
                 let charges = groupedCharges[key] ?? []
-                
+
                 if let firstCharge = charges.first {
                     ScrollView { // 👈 Add this ScrollView to make tab scrollable
                         VStack(alignment: .leading, spacing: 10) {
@@ -490,7 +534,7 @@ struct OfflineChangesTabView: View {
                                     .font(.headline)
                                     .padding(.bottom, 4)
                             }
-                            
+
                             ForEach(charges.sorted(by: { $0.version < $1.version }), id: \.objectID) { charge in
                                 VStack(alignment: .leading) {
                                     Text("Hours: \(charge.hours ?? 0)")
