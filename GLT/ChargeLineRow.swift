@@ -10,7 +10,6 @@ import CoreData
 
 struct ChargeLineRow: View {
     // MARK: - Input Properties
-    @Environment(\.managedObjectContext) var managedObjectContext
     @Binding var chargeLine: ChargeLine
     var day: (day: Int, weekday: String)
     var curID: Int32
@@ -25,12 +24,13 @@ struct ChargeLineRow: View {
     @State private var isEditingHours = false
     @State private var hoursColumnWidth: CGFloat = 50
     @State private var noteColumnWidth: CGFloat = 50
-
-    // MARK: - Computed properties
-
+    
+    @State private var displayText: String = "0.0"
+    @State private var isEditingManually: Bool = false
+    
     private var assignmentWindow: (assigned: Date?, unassigned: Date?) {
         let tsCharge = viewModel.fetchTSCharge()
-        print("ts charge:", tsCharge)
+//        print("ts charge:", tsCharge)
         return (tsCharge?.dateAssigned, tsCharge?.dateUnassigned)
     }
 
@@ -63,7 +63,8 @@ struct ChargeLineRow: View {
         return notesButtonColor
     }
 
-    // MARK: - Custom initializer
+
+    // Custom initializer to set up the view model.
     init(chargeLine: Binding<ChargeLine>,
          day: (day: Int, weekday: String),
          curID: Int32,
@@ -84,7 +85,7 @@ struct ChargeLineRow: View {
             year: year,
             context: context))
     }
-
+    
     // MARK: - View Body
     var body: some View {
         ZStack {
@@ -104,25 +105,18 @@ struct ChargeLineRow: View {
                                 .preference(key: ChargeLineNameWidthKey.self, value: proxy.size.width)
                         }
                     )
-
+                
                 // Layout for input controls.
                 HStack {
-                    // Hours text field
+                    // Hours text field on the left.
                     AutoHighlightTextField(
                         text: Binding(
-                            get: {
-                                if let tsCharge = viewModel.fetchTSCharge() {
-                                    if let tempHours = tsCharge.tempHours {
-                                        return tempHours.stringValue
-                                    }
-                                    if let hours = tsCharge.hours {
-                                        return hours.stringValue
-                                    }
-                                }
-                                return "0.0"
-                            },
+                            get: { displayText },
                             set: { newValue in
-                                viewModel.saveTempHours(newValue: newValue)
+                                displayText = newValue
+                                if isEditingManually {
+                                    viewModel.saveTempHours(newValue: newValue)
+                                }
                             }
                         ),
                         placeholder: "Hours",
@@ -130,14 +124,15 @@ struct ChargeLineRow: View {
                         textColor: effectiveTextColor,
                         onEditingChanged: { editing in
                             isEditingHours = editing
+                            isEditingManually = editing
                         }
                     )
                     .disabled(isDisabled)
                     .frame(width: hoursColumnWidth, height: 35)
-
+                    
                     Spacer()
-
-                    // Notes button
+                    
+                    // Note button on the right.
                     Button(action: {
                         viewModel.handleNotesButtonPress { tsCharge in
                             selectedTSCharge = tsCharge
@@ -164,7 +159,7 @@ struct ChargeLineRow: View {
                     }
                 }
                 .padding(.horizontal, 12)
-
+                
                 Text("Total: \(viewModel.totalHours(), specifier: "%.2f") hours")
                     .font(.caption)
                     .foregroundColor(Color.secondary)
@@ -172,25 +167,37 @@ struct ChargeLineRow: View {
             .padding(4)
             .contentShape(Rectangle())
         }
-        .onTapGesture { hideKeyboard() }
-        .onAppear { viewModel.updateCurrentColor() }
+        .onTapGesture {
+            hideKeyboard()
+        }
+        .onAppear {
+            if let tsCharge = viewModel.fetchTSCharge() {
+                displayText = tsCharge.tempHours?.stringValue ?? tsCharge.hours?.stringValue ?? "0.0"
+            }
+            viewModel.updateCurrentColor()
+        }
+
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name.NSManagedObjectContextObjectsDidChange)) { _ in
-            if !isEditingHours {
+            if !isEditingManually {
+                if let tsCharge = viewModel.fetchTSCharge() {
+                    displayText = tsCharge.tempHours?.stringValue ?? tsCharge.hours?.stringValue ?? "0.0"
+                }
                 viewModel.updateCurrentColor()
             }
         }
+
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onEnded { _ in hideKeyboard() }
         )
+        // Present a sheet using your existing ChargeNoteDetailView.
         .sheet(isPresented: $showingNotesSheet) {
             if let tsCharge = selectedTSCharge {
                 ChargeNoteDetailView(tsCharge: tsCharge, context: context)
             }
         }
     }
-
-    // MARK: - Helpers
+    
     private var notesButtonColor: Color {
         if let tsCharge = viewModel.fetchTSCharge() {
             return tsCharge.noted ? .blue : Color(hex: "8c3731")

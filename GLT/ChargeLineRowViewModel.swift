@@ -59,11 +59,53 @@ class ChargeLineRowViewModel: ObservableObject {
     func fetchTSCharge() -> TSCharge? {
         let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
         fetchRequest.predicate = NSPredicate(
+            format: "employeeID == %d AND chargeID == %d AND month == %d AND year == %d AND day == %d AND ((offline == NO AND verified == YES AND denied == NO) OR (offline == YES AND verified == NO AND denied == NO)) ",
+            curID, chargeLine.clID, month, year, Int16(day)
+        )
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(key: "version", ascending: false)
+        ]
+
+        do {
+            let results = try context.fetch(fetchRequest)
+            if let finalResults = results.first{
+                print("charge: \(finalResults.chargeID), day: \(finalResults.day), tempHours: \(finalResults.tempHours ?? 0), version: \(finalResults.version ?? 0)")
+            }
+            return results.first
+        } catch {
+            print("Fetch error: \(error)")
+            return nil
+        }
+    }
+    
+     /*
+    func fetchTSCharge() -> TSCharge? {
+        let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+        
+        let basePredicate = NSPredicate(
             format: "employeeID == %d AND chargeID == %d AND month == %d AND year == %d AND day == %d",
             curID, chargeLine.clID, month, year, Int16(day)
         )
+
+        // Allowed combinations:
+        let case1 = NSPredicate(format: "offline == NO AND verified == YES AND denied == NO")
+        let case2 = NSPredicate(format: "offline == YES AND verified == NO AND denied == NO")
+
+        // Just OR them together (case1 and case3 are same, but kept here for clarity)
+        let allowedPredicate = NSCompoundPredicate(orPredicateWithSubpredicates: [case1, case2])
+
+        // Combine base and allowed logic
+        let finalPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [basePredicate, allowedPredicate])
+        
+        fetchRequest.predicate = finalPredicate
+        fetchRequest.sortDescriptors = [
+            NSSortDescriptor(key: "version", ascending: false)
+        ]
+        
         return try? context.fetch(fetchRequest).first
     }
+*/
+
     
     /// Computes the total hours for the charge line.
     func totalHours() -> Double {
@@ -115,11 +157,32 @@ class ChargeLineRowViewModel: ObservableObject {
                     newTSCharge.year = self.year
                     newTSCharge.day = Int16(self.day)
                     newTSCharge.tempHours = cappedValue
+                    newTSCharge.saved = false
+                    newTSCharge.hours = 0.0
+                    newTSCharge.denied = false
+                    newTSCharge.verified = false//
+                    newTSCharge.offline = true
+                    /*
+                    // Fetch the latest version for this employee/charge/day
+                    let versionRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+                    versionRequest.predicate = NSPredicate(
+                        format: "employeeID == %d AND chargeID == %d AND month == %d AND year == %d AND day == %d",
+                        self.curID, self.chargeLine.clID, self.month, self.year, Int16(self.day)
+                    )
+                    versionRequest.sortDescriptors = [NSSortDescriptor(key: "version", ascending: false)]
+                    versionRequest.fetchLimit = 1
+
+                    let latest = try? self.context.fetch(versionRequest).first
+                    let nextVersion = (latest?.version ?? 0) + 1
+                    newTSCharge.version = nextVersion
+*/
+                    
                     do {
                         try self.context.save()
                     } catch {
                         print("Error saving new TSCharge: \(error.localizedDescription)")
                     }
+                     
                 }
             }
             DispatchQueue.main.async {
@@ -150,18 +213,5 @@ class ChargeLineRowViewModel: ObservableObject {
                 }
             }
         }
-    }
-    
-    var assignmentWindow: (assigned: Date?, unassigned: Date?) {
-        let tsCharge = GLTFunctions.fetchTarTSCharge(
-            byEmployeeID: curID,
-            year: year,
-            month: month,
-            day: Int16(day),
-            clID: chargeLine.clID,
-            context: context
-        )
-        return (tsCharge?.dateAssigned, tsCharge?.dateUnassigned)
-        
     }
 }

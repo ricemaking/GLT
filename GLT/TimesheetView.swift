@@ -106,7 +106,7 @@ struct TimesheetView: View {
     var body: some View {
         VStack {
             if let curTimesheet = curTimesheet {
-                Text("Timesheet for: \(GLTFunctions.convertIntToMonth(from: Int(curTimesheet.month))), \(Int(curTimesheet.year))")
+                Text("Timesheet for: \(GLTFunctions.convertIntToMonth(from: Int(curTimesheet.month))), \(curTimesheet.year)")
                 Text("Current Timesheet ID: \(curTimesheet.id)")
                 Text("Days in Timesheet Month: \(GLTFunctions.numberOfDaysInCurrentMonth())")
             }
@@ -123,11 +123,18 @@ struct TimesheetView: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: 16) {  // Spacing between day columns.
                         ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
+//                            let assignedCLs = GLTFunctions.fetchAssignedOrHasHoursChargeLines(
+//                                for: targetid ?? 0,
+//                                month: month,
+//                                year: year,
+//                                context: managedObjectContext
+//                            )
+                                                        
                             DayView(
                                 day: day,
                                 month: month,
                                 year: year,
-                                curID: employee?.id ?? 0,  // Use the employee id if available.
+                                curID: targetid ?? 0,  // Use the employee id if available.
                                 chargeLines: $chargeLines,
                                 weekends: weekends,
                                 context: managedObjectContext,
@@ -227,6 +234,12 @@ struct TimesheetView: View {
     private func setupView() {
         let empID = targetid
         employee = GLTFunctions.fetchTarEmp(byID: empID, context: managedObjectContext)
+//        chargeLines = GLTFunctions.fetchAssignedOrHasHoursChargeLines(
+//            for: empID,
+//            month: month,
+//            year: year,
+//            context: managedObjectContext
+//        )
         chargeLines = GLTFunctions.fetchChargeLines(for: empID, in: managedObjectContext)
         
         if let cur = curTimesheet {
@@ -244,6 +257,7 @@ struct TimesheetView: View {
         formatter.timeStyle = .medium
         return formatter
     }
+
     
     // MARK: - Save and Submit Functions
     

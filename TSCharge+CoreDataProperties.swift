@@ -38,10 +38,12 @@ extension TSCharge {
     @NSManaged public var employee: Employee?
     @NSManaged public var timesheet: Timesheet?
     @NSManaged public var offline: Bool
-
+    @NSManaged public var denied: Bool
+    @NSManaged public var verified: Bool
 
 }
 
 extension TSCharge : Identifiable {
 
 }
+

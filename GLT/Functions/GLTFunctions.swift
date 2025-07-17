@@ -350,8 +350,8 @@ public struct GLTFunctions {
         
         return dayBeforeFirstTS
     }
-
-
+    
+    
     // Function to get the start date of the employee
     public static func fetchEmpStartDate(empID: Int32, empContext: NSManagedObjectContext) -> Date? {
         guard let emp = GLTFunctions.fetchTarEmp(byID: empID, context: empContext) else {
@@ -366,7 +366,7 @@ public struct GLTFunctions {
         
         return empStartDate // Return the valid start date
     }
-
+    
     
     // Function to fetch timesheets based on starting month/year - end month year, and using a sort key to sort in ascending manner (unless ascending specified as false.  By default this only returns enabled timesheets, however, it can be configured to return not enabled timesheets.
     public static func fetchFilteredTimesheets(for employeeID: Int32,
@@ -420,10 +420,10 @@ public struct GLTFunctions {
             return nil
         }
     }
-
-
-
-   
+    
+    
+    
+    
     //Function to get properly formatted current local time (per device timezone settings) UTC time using date input, otherwise, it will return the current time in local time zone formatted as desired.
     public static func fetchLocalTime(inputDate: Date?) -> String {
         // Use the provided date, or default to the current date if nil
@@ -439,7 +439,7 @@ public struct GLTFunctions {
         return formattedString
     }
     
-
+    
     
     // Function to get the highest charge line ID, which is useful for determining what CLID is available for newly created charge lines.
     public static func fetchHighestCLID(context: NSManagedObjectContext) -> Int32 {
@@ -456,8 +456,8 @@ public struct GLTFunctions {
         }
     }
     
-  
-
+    
+    
     // Function to get the highest employee ID
     public static func fetchHighestEmployeeID(context: NSManagedObjectContext) -> Int32 {
         let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
@@ -503,53 +503,53 @@ public struct GLTFunctions {
         return formattedString
     }
     
-
     
-     //Function to getch the Employee entity object associated with the target id.
-     public static func fetchTarEmp(byEmail targetEmail: String, context: NSManagedObjectContext) -> Employee? {
-         let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
-         fetchRequest.predicate = NSPredicate(format: "email == %@", targetEmail)
-         do {
-             let results = try context.fetch(fetchRequest)
-             return results.first
-         } catch {
-             print("Could not fetch employee ID using email provided \(targetEmail): \(error)")
-             return nil
-         }
-     }
-     
-     //Function to getch the Employee entity object associated with the target id.
-     public static func fetchTarEmp(byID targetid: Int32, context: NSManagedObjectContext) -> Employee? {
-         let predicate = NSPredicate(format: "id == %d", targetid)
-         let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
-         fetchRequest.predicate = predicate
-         do {
-             let results = try context.fetch(fetchRequest)
-             return results.first
-         } catch {
-             print("Could not fetch employee using ID provided \(targetid): \(error)")
-             return nil
-         }
-     }
-     
-     //Function to getch the Employee entity object associated with the target id.
-     public static func fetchTarEmpID(byEmail targetEmail: String, context: NSManagedObjectContext) -> Int32? {
-         let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
-         fetchRequest.predicate = NSPredicate(format: "email ==[c] %@", targetEmail)
-         do {
-             let employees = try context.fetch(fetchRequest)
-             let employee = employees[0]
-             let employeeID = employee.id
-             return employeeID
-             }
-          catch {
-             print("Could not fetch employee ID using email provided \(targetEmail): \(error)")
-             //return Int32(606060)
-              return Int32(696969)
-         }
-     }
-     
-
+    
+    //Function to getch the Employee entity object associated with the target id.
+    public static func fetchTarEmp(byEmail targetEmail: String, context: NSManagedObjectContext) -> Employee? {
+        let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "email == %@", targetEmail)
+        do {
+            let results = try context.fetch(fetchRequest)
+            return results.first
+        } catch {
+            print("Could not fetch employee ID using email provided \(targetEmail): \(error)")
+            return nil
+        }
+    }
+    
+    //Function to getch the Employee entity object associated with the target id.
+    public static func fetchTarEmp(byID targetid: Int32, context: NSManagedObjectContext) -> Employee? {
+        let predicate = NSPredicate(format: "id == %d", targetid)
+        let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
+        fetchRequest.predicate = predicate
+        do {
+            let results = try context.fetch(fetchRequest)
+            return results.first
+        } catch {
+            print("Could not fetch employee using ID provided \(targetid): \(error)")
+            return nil
+        }
+    }
+    
+    //Function to getch the Employee entity object associated with the target id.
+    public static func fetchTarEmpID(byEmail targetEmail: String, context: NSManagedObjectContext) -> Int32? {
+        let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "email ==[c] %@", targetEmail)
+        do {
+            let employees = try context.fetch(fetchRequest)
+            let employee = employees[0]
+            let employeeID = employee.id
+            return employeeID
+        }
+        catch {
+            print("Could not fetch employee ID using email provided \(targetEmail): \(error)")
+            //return Int32(606060)
+            return Int32(696969)
+        }
+    }
+    
+    
     //Function to getch a specific TSCharge entity object associated with the timesheet id, month, year, and day
     public static func fetchTarTSCharge(byEmployeeID empID: Int32, year: Int16, month: Int16, day: Int16, clID: Int32, context: NSManagedObjectContext) -> TSCharge? {
         let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest() // Define fetch request
@@ -568,7 +568,7 @@ public struct GLTFunctions {
         
         var version: Int16 = 0
         var recentCharge: TSCharge?
-
+        
         do {
             // Fetch TSCharges using the context
             let TSCharges = try context.fetch(fetchRequest)
@@ -593,9 +593,9 @@ public struct GLTFunctions {
             return nil
         }
     }
-
+    
     //Function responsible for fetching the timesheet of the target employee
-
+    
     
     public static func firstDateOfCurrentMonth(from date: Date) -> Date? {
         let calendar = Calendar.current
@@ -610,9 +610,9 @@ public struct GLTFunctions {
         
         return calendar.date(from: startOfMonthComponents)
     }
-
-
-
+    
+    
+    
     public static func firstDateOfNextMonth(from date: Date) -> Date? {
         let calendar = Calendar.current
         // Get the current year and month components
@@ -642,24 +642,24 @@ public struct GLTFunctions {
         
         return nil
     }
-
+    
     //takes integer representation of month and returns corresponding month name.
     func monthName(from int: Int) -> String? {
         guard int >= 1 && int <= 12 else { return nil } // Ensure valid month
-
+        
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM"
-
+        
         var dateComponents = DateComponents()
         dateComponents.month = int
-
+        
         let calendar = Calendar.current
         if let date = calendar.date(from: dateComponents) {
             return dateFormatter.string(from: date)
         }
         return nil
     }
-
+    
     //Function to get the number of dats in current month
     public static func numberOfDaysInCurrentMonth() -> Int {
         let calendar = Calendar.current
@@ -699,10 +699,10 @@ public struct GLTFunctions {
             let year = dateString.dropFirst(4)
             return "\(day)/\(month)/\(year)"
         }
-
+        
         return nil
     }
-
+    
     // Function to validate date input format
     public static func validDateInput(_ dateString: String) -> Bool {
         let separators = ["-", "/", ".", "\\"]
@@ -723,10 +723,10 @@ public struct GLTFunctions {
            let _ = Int(dateString.dropFirst(4)) { // Check yyyy
             return true
         }
-
+        
         return false
     }
-
+    
     public static func validateDecimalInput(_ input: String) -> Bool {
         return Decimal(string: input) != nil
     }
@@ -764,6 +764,39 @@ public struct GLTFunctions {
         catch {
             print(dateAssigned, dateUnassigned)
             NSLog("Error occured trying to assign assignment date to TSCharge: %d, under employee %d", clID, employeeID)
+        }
+    }
+    
+    public static func fetchAssignedOrHasHoursChargeLines(
+        for employeeID: Int32,
+        month: Int16,
+        year: Int16,
+        context: NSManagedObjectContext
+    ) -> [ChargeLine] {
+        let tsFetch: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+        tsFetch.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d", employeeID, month, year)
+        
+        do {
+            let tsCharges = try context.fetch(tsFetch)
+            
+            let relevantCLIDs = tsCharges.compactMap { tsCharge -> Int32? in
+                if tsCharge.dateAssigned != nil ||
+                    (tsCharge.hours?.doubleValue ?? 0) > 0 ||
+                    (tsCharge.tempHours?.doubleValue ?? 0) > 0 {
+                    return tsCharge.chargeID
+                }
+                return nil
+            }
+            
+            guard !relevantCLIDs.isEmpty else { return [] }
+            
+            let clFetch: NSFetchRequest<ChargeLine> = ChargeLine.fetchRequest()
+            clFetch.predicate = NSPredicate(format: "clID IN %@", relevantCLIDs)
+            
+            return try context.fetch(clFetch)
+        } catch {
+            print("Error fetching relevant ChargeLines: \(error)")
+            return []
         }
     }
 }
