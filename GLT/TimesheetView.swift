@@ -119,7 +119,7 @@ struct TimesheetView: View {
                                 day: day,
                                 month: month,
                                 year: year,
-                                curID: employee?.id ?? 0,  // Use the employee id if available.
+                                curID: targetid,  // Use the employee id if available.
                                 chargeLines: $chargeLines,
                                 weekends: weekends,
                                 context: managedObjectContext,
@@ -224,8 +224,8 @@ struct TimesheetView: View {
             return
         }
 
-        employee = GLTFunctions.fetchTarEmp(byID: empID, context: managedObjectContext)
-        chargeLines = GLTFunctions.fetchChargeLines(for: empID, in: managedObjectContext)
+        employee = GLTFunctions.fetchTarEmp(byID: targetid, context: managedObjectContext)
+        chargeLines = GLTFunctions.fetchChargeLines(for: targetid, in: managedObjectContext)
 
         if let cur = curTimesheet {
             month = Int16(cur.month)
@@ -248,7 +248,7 @@ struct TimesheetView: View {
     private func saveAllChargeLines() {
         if hasInternetConnection() && offlineLogin == false{
             managedObjectContext.perform {
-                let currentEmpID = employee?.id ?? 0
+                let currentEmpID = targetid
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO", currentEmpID, month, year)
                 do {
@@ -295,7 +295,7 @@ struct TimesheetView: View {
             offlineLogin=true
             print("offline login true, no internet connection")
              managedObjectContext.perform {
-                 let currentEmpID = employee?.id ?? 0
+                 let currentEmpID = targetid
                  let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                  fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO AND denied == NO", currentEmpID, month, year)
                  print("fetched charges")
@@ -342,7 +342,7 @@ struct TimesheetView: View {
         }
         else if hasInternetConnection() && offlineLogin == true{
             managedObjectContext.perform {
-                let currentEmpID = employee?.id ?? 0
+                let currentEmpID = targetid
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "employeeID==%d AND offline==YES AND saved==YES AND verified == NO", currentEmpID)
                 fetchRequest.sortDescriptors = [
@@ -371,7 +371,7 @@ struct TimesheetView: View {
     
     private func submitTimesheet() {
         managedObjectContext.perform {
-            let currentEmpID = employee?.id ?? 0
+            let currentEmpID = targetid
             let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d", currentEmpID, month, year)
             
