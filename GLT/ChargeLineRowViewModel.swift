@@ -160,7 +160,7 @@ class ChargeLineRowViewModel: ObservableObject {
                     newTSCharge.saved = false
                     newTSCharge.hours = 0.0
                     newTSCharge.denied = false
-                    newTSCharge.verified = false//
+                    newTSCharge.verified = false
                     newTSCharge.offline = true
                     /*
                     // Fetch the latest version for this employee/charge/day
@@ -213,5 +213,30 @@ class ChargeLineRowViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    
+    private var assignmentWindow: (assigned: Date?, unassigned: Date?) {
+        let tsCharge = fetchTSCharge()
+//        print("ts charge:", tsCharge)
+        return (tsCharge?.dateAssigned, tsCharge?.dateUnassigned)
+    }
+
+    func isDisabled() -> Bool {
+        guard let cellDate = Calendar.current.date(from: DateComponents(year: Int(year), month: Int(month), day: Int(day))) else {
+            return false
+        }
+        let (assigned, unassigned) = assignmentWindow
+        
+//        print("celldate:", cellDate)
+//        print("assignment window:", assignmentWindow)
+
+        if let assigned = assigned, cellDate < assigned {
+            return true
+        }
+        if let unassigned = unassigned, cellDate > unassigned {
+            return true
+        }
+        return false
     }
 }

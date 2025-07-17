@@ -35,7 +35,7 @@ public struct Emp2CLView1: View {
             Button("Proceed to Charge Lines") {
                 if selectedCount > 0 {
                     selectedEmployeeIDs = selectedEmployees.filter { $0.value }.map { $0.key }
-                    path = NavigationPath() // Reset the navigation path to go back
+                    path = NavigationPath()
                     path.append(AppView.management)
                     path.append(AppView.emp2cl1)
                     path.append(AppView.emp2cl2)

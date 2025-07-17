@@ -769,12 +769,20 @@ public struct GLTFunctions {
     
     public static func fetchAssignedOrHasHoursChargeLines(
         for employeeID: Int32,
-        month: Int16,
-        year: Int16,
         context: NSManagedObjectContext
     ) -> [ChargeLine] {
+        var resultSet: Set<ChargeLine> = []
+
+        let employeeFetch: NSFetchRequest<Employee> = Employee.fetchRequest()
+        employeeFetch.predicate = NSPredicate(format: "id == %d", employeeID)
+        
+        if let employee = try? context.fetch(employeeFetch).first,
+           let assignedChargeLines = employee.chargeLine as? Set<ChargeLine> {
+            resultSet.formUnion(assignedChargeLines)
+        }
+
         let tsFetch: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
-        tsFetch.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d", employeeID, month, year)
+        tsFetch.predicate = NSPredicate(format: "employeeID == %d", employeeID)
         
         do {
             let tsCharges = try context.fetch(tsFetch)
@@ -788,15 +796,19 @@ public struct GLTFunctions {
                 return nil
             }
             
-            guard !relevantCLIDs.isEmpty else { return [] }
+            if !relevantCLIDs.isEmpty {
+                let clFetch: NSFetchRequest<ChargeLine> = ChargeLine.fetchRequest()
+                clFetch.predicate = NSPredicate(format: "clID IN %@", relevantCLIDs)
+                
+                let tsChargeLines = try context.fetch(clFetch)
+                resultSet.formUnion(tsChargeLines)
+            }
             
-            let clFetch: NSFetchRequest<ChargeLine> = ChargeLine.fetchRequest()
-            clFetch.predicate = NSPredicate(format: "clID IN %@", relevantCLIDs)
-            
-            return try context.fetch(clFetch)
         } catch {
-            print("Error fetching relevant ChargeLines: \(error)")
-            return []
+            print("Error fetching TSCharge/ChargeLines: \(error)")
         }
+        
+        return Array(resultSet)
     }
+
 }

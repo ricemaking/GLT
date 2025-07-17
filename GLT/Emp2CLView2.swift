@@ -10,6 +10,8 @@ public struct Emp2CLView2: View {
     @State var selectedChargeIDs: [Int32] = []
     @State var confirmAssignment: Bool = false
     @State var initialSelection: [Int32: Bool] = [:]
+    @State private var changeLogMessage: String = ""
+    @State private var previousAssignments: [Int32: Set<Int32>] = [:]
 
     @FetchRequest(entity: Employee.entity(), sortDescriptors: []) var employees: FetchedResults<Employee>
     @FetchRequest(entity: ChargeLine.entity(), sortDescriptors: []) var cls: FetchedResults<ChargeLine>
@@ -36,11 +38,12 @@ public struct Emp2CLView2: View {
                 }
             }
             Button("Assign Selected") {
+                generateChangeLog()
                 confirmAssignment = true
             }
             .alert("Confirm Assignment", isPresented: $confirmAssignment) {
-                Button("Cancel") {}
-                Button("Confirm") {
+                Button("Cancel", role: .cancel) {}
+                Button("Confirm", role: .destructive) {
                     selectedChargeIDs = selectedChargeLines.filter { $0.value }.map { $0.key }
                     for chargeLine in cls {
                         let isSelected = selectedChargeLines[chargeLine.clID] ?? false
@@ -90,7 +93,7 @@ public struct Emp2CLView2: View {
                     path.append(AppView.emp2cl1)
                 }
             } message: {
-                Text("Are you sure you want to apply these changes?")
+                Text(changeLogMessage)
             }
 
             if filteredEmployees.isEmpty {
@@ -110,10 +113,12 @@ public struct Emp2CLView2: View {
     }
     
     private func initSelections() {
+        previousAssignments = [:]
         var assignedIDs: Set<Int32> = []
 
         for employeeID in selectedEmployeeIDs {
-            let chargeLineIDs = GLTFunctions.fetchChargeLineIDs(for: employeeID, in: managedObjectContext)
+            let chargeLineIDs = Set(GLTFunctions.fetchChargeLineIDs(for: employeeID, in: managedObjectContext))
+            previousAssignments[employeeID] = chargeLineIDs
             assignedIDs.formUnion(chargeLineIDs)
         }
 
@@ -125,6 +130,45 @@ public struct Emp2CLView2: View {
     }
     
     private func generateChangeLog() {
-        var returnString = "Are you sure you want to apply the following changes?"
+        var logLines: [String] = []
+        
+        for employeeID in selectedEmployeeIDs {
+            guard let employee = employees.first(where: { $0.id == employeeID }) else { continue }
+            let employeeName = "\(employee.nameFirst ?? "") \(employee.nameLast ?? "")".trimmingCharacters(in: .whitespaces)
+            let initiallyAssigned = previousAssignments[employeeID] ?? []
+            var added: [String] = []
+            var removed: [String] = []
+            
+            for chargeLine in cls {
+                let clID = chargeLine.clID
+                let clName = chargeLine.clName ?? "CL \(clID)"
+                let isNowSelected = selectedChargeLines[clID] ?? false
+                let wasAssignedToThisEmployee = initiallyAssigned.contains(clID)
+                
+                if !wasAssignedToThisEmployee && isNowSelected {
+                    added.append("\(clName) [ID:\(clID)]")
+                } else if wasAssignedToThisEmployee && !isNowSelected {
+                    removed.append("\(clName) [ID:\(clID)]")
+                }
+            }
+            
+            if !added.isEmpty || !removed.isEmpty {
+                logLines.append("Changes for \(employeeName):")
+                if !added.isEmpty {
+                    logLines.append("  + Assign: " + added.joined(separator: ", "))
+                }
+                if !removed.isEmpty {
+                    logLines.append("  - Unassign: " + removed.joined(separator: ", "))
+                }
+            }
+        }
+        
+        if logLines.isEmpty {
+            changeLogMessage = "No changes detected"
+        } else {
+            changeLogMessage = logLines.joined(separator: "\n\n")
+        }
     }
+
+
 }

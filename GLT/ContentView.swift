@@ -287,17 +287,32 @@ struct ContentView: View
                                             }
                                             else
                                             {
+                                                offlineLogin=true
                                                 activeLogin = false
-                                                // include code here to prmopt for offline login
-                                                
-                                                //
                                             }
                                         }
+                                        
                                     }
                                     else {
-                                        print(loginID)
-                                        activeLogin = true
+                                        //add an if to identify if its because of network error
+                                        guard let enteredEmail = loginID?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else {
+                                            message = "Invalid email."
+                                            return
+                                        }
+
+                                        let found = employees.contains { employee in
+                                            (employee.email?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? "") == enteredEmail
+                                        }
+
+                                        if found {
+                                            activeLogin = true
+                                            message = "Offline login successful."
+                                        } else {
+                                            activeLogin = false
+                                            message = "Email not found for offline login."
+                                        }
                                     }
+
                                 }
                                 Toggle("Account Selection Prompt", isOn: $shouldPromptForAccount)
                                     .fontDesign(.monospaced)
@@ -311,7 +326,7 @@ struct ContentView: View
                             .bold()
                             .foregroundColor(Color(hex: "FF6600"))
                             
-                            HStack {
+                            /*HStack {
                                 Toggle("Offline Login", isOn: $offlineLogin)
                                     .fontDesign(.monospaced)
                                     .font(.system(size: 18))
@@ -323,6 +338,8 @@ struct ContentView: View
                             .textCase(.uppercase)
                             .bold()
                             .foregroundColor(Color(hex: "FF6600"))
+                             */
+                             
                         }
                     }
                 }

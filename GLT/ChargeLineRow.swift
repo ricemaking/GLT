@@ -27,41 +27,6 @@ struct ChargeLineRow: View {
     
     @State private var displayText: String = "0.0"
     @State private var isEditingManually: Bool = false
-    
-    private var assignmentWindow: (assigned: Date?, unassigned: Date?) {
-        let tsCharge = viewModel.fetchTSCharge()
-//        print("ts charge:", tsCharge)
-        return (tsCharge?.dateAssigned, tsCharge?.dateUnassigned)
-    }
-
-    private var isDisabled: Bool {
-        guard let cellDate = Calendar.current.date(from: DateComponents(year: Int(year), month: Int(month), day: day.day)) else {
-            return false
-        }
-        let (assigned, unassigned) = assignmentWindow
-        
-//        print("celldate:", cellDate)
-//        print("assignment window:", assignmentWindow)
-
-        if let assigned = assigned, cellDate < assigned {
-            return true
-        }
-        if let unassigned = unassigned, cellDate > unassigned {
-            return true
-        }
-        return false
-    }
-
-    private var effectiveTextColor: UIColor {
-        isDisabled ? UIColor.gray : viewModel.currentColor
-    }
-
-    private var effectiveNotesButtonColor: Color {
-        if isDisabled {
-            return Color.gray
-        }
-        return notesButtonColor
-    }
 
 
     // Custom initializer to set up the view model.
@@ -121,13 +86,13 @@ struct ChargeLineRow: View {
                         ),
                         placeholder: "Hours",
                         keyboardType: .decimalPad,
-                        textColor: effectiveTextColor,
+                        textColor: viewModel.currentColor,
                         onEditingChanged: { editing in
                             isEditingHours = editing
                             isEditingManually = editing
                         }
                     )
-                    .disabled(isDisabled)
+                    .disabled(viewModel.isDisabled())
                     .frame(width: hoursColumnWidth, height: 35)
                     
                     Spacer()
@@ -143,10 +108,10 @@ struct ChargeLineRow: View {
                             .font(.system(size: 18))
                             .padding(4)
                             .foregroundColor(.white)
-                            .background(effectiveNotesButtonColor)
+                            .background(notesButtonColor)
                             .cornerRadius(4)
                     }
-                    .disabled(isDisabled)
+                    .disabled(viewModel.isDisabled())
                     .frame(width: max(noteColumnWidth, 44), height: 40, alignment: .trailing)
                     .overlay(
                         GeometryReader { geometry in

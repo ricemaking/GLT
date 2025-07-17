@@ -61,6 +61,7 @@ struct TimesheetView: View {
 
     @State private var employee: Employee?
     @State private var chargeLines: [ChargeLine] = []
+    @State private var chargeLineHistory: [ChargeLine] = []
     @State private var welcomeMessage: String = ""
     @State private var month: Int16 = 0
     @State private var year: Int16 = 0
@@ -106,6 +107,10 @@ struct TimesheetView: View {
                 Text("Current Timesheet ID: \(curTimesheet.id)")
                 Text("Days in Timesheet Month: \(GLTFunctions.numberOfDaysInCurrentMonth())")
             }
+            else {
+                Text("Select a timesheet first")
+                    .foregroundColor(.red)
+            }
             
             if let lastRun = previousRunTimestamp {
                 Text("Previous Run: \(lastRun, formatter: dateFormatter)")
@@ -128,6 +133,26 @@ struct TimesheetView: View {
                         }
                     }
                     .padding(.horizontal, 12)
+                }
+                Text("ALL CHARGELINES PREVIOUSLY ASSIGNED TO:")
+                ScrollView {
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 16) {  // Spacing between day columns.
+                            ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
+                                DayView(
+                                    day: day,
+                                    month: month,
+                                    year: year,
+                                    curID: targetid,  // Use the employee id if available.
+                                    chargeLines: $chargeLineHistory,
+                                    weekends: weekends,
+                                    context: managedObjectContext,
+                                    cellWidth: $cellWidth  // Pass the binding for uniform dynamic width.
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                    }
                 }
             }
             
@@ -226,6 +251,7 @@ struct TimesheetView: View {
 
         employee = GLTFunctions.fetchTarEmp(byID: targetid, context: managedObjectContext)
         chargeLines = GLTFunctions.fetchChargeLines(for: targetid, in: managedObjectContext)
+        chargeLineHistory = GLTFunctions.fetchAssignedOrHasHoursChargeLines(for: targetid, context: managedObjectContext)
 
         if let cur = curTimesheet {
             month = Int16(cur.month)
@@ -246,7 +272,7 @@ struct TimesheetView: View {
     // MARK: - Save and Submit Functions
 
     private func saveAllChargeLines() {
-        if hasInternetConnection() && offlineLogin == false{
+        if hasInternetConnection() && offlineLogin == false {
             managedObjectContext.perform {
                 let currentEmpID = targetid
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
@@ -342,7 +368,50 @@ struct TimesheetView: View {
         }
         else if hasInternetConnection() && offlineLogin == true{
             managedObjectContext.perform {
-                let currentEmpID = targetid
+                let currentEmpID = employee?.id ?? 0
+                let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO", currentEmpID, month, year)
+                do {
+                    let tsCharges = try managedObjectContext.fetch(fetchRequest) //fetch all unsaved tscharges
+                    
+                    for tsCharge in tsCharges {
+                        if let tempHours = tsCharge.tempHours, tsCharge.tempHours != tsCharge.hours{
+                            tsCharge.hours = tempHours
+                            //tsCharge.tempHours = nil
+                            tsCharge.saved = true
+                            tsCharge.dateSaved = Date()
+                            tsCharge.offline = false
+                            print("marked tsCharge as saved online, version: \(tsCharge.version)")
+                            //version?
+                            let newTSCharge = TSCharge(context: managedObjectContext)
+                            newTSCharge.employeeID = tsCharge.employeeID
+                            newTSCharge.chargeID = tsCharge.chargeID
+                            newTSCharge.month = tsCharge.month
+                            newTSCharge.year = tsCharge.year
+                            newTSCharge.day = tsCharge.day
+                            newTSCharge.tempHours = tsCharge.tempHours
+                            newTSCharge.saved = false
+                            newTSCharge.hours = tsCharge.tempHours
+                            newTSCharge.version = tsCharge.version + 1
+                            newTSCharge.offline = false
+                            newTSCharge.verified = true
+                            print("created new online tsCharge, version: \(newTSCharge.version)")
+                            do {
+                                try managedObjectContext.save()
+                            } catch {
+                                print("Error saving new TSCharge: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                    try managedObjectContext.save()
+                    managedObjectContext.refreshAllObjects()
+                    NSLog("Successfully saved all TSCharge hours, marking them as saved.")
+                } catch {
+                    NSLog("Error saving TSCharge: \(error.localizedDescription)")
+                }
+            }
+            managedObjectContext.perform {
+                let currentEmpID = employee?.id ?? 0
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "employeeID==%d AND offline==YES AND saved==YES AND verified == NO", currentEmpID)
                 fetchRequest.sortDescriptors = [
@@ -350,7 +419,6 @@ struct TimesheetView: View {
                     NSSortDescriptor(key: "chargeID", ascending: true),
                     NSSortDescriptor(key: "version", ascending: true)
                 ]
-
                         
                 do {
                     let tsCharges = try managedObjectContext.fetch(fetchRequest) //fetch all unsaved tscharges
@@ -400,19 +468,24 @@ struct TimesheetView: View {
     }
     
     private func authenticateAndApproveChanges() {
+        print("current: \(loginID)")
+
         AuthenticationManager.shared.signIn(shouldPromptForAccount: shouldPromptForAccount, revokeRequest: revokeRequest) { success, error in
             if success {
                 AuthenticationManager.shared.acquireTokenSilently { token, silentError in
                     if let token = token {
                         accessToken = token
                         jwtPayloadString = AuthenticationManager.shared.extractJWTPayloadString(from: token) ?? "Unknown jwtPayloadString"
-                        loginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
+                        let currentLoginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
                         activeLogin = true
                         revokeRequest = false
                         
                         AuthenticationManager.shared.checkOneDriveAccess(accessToken: token) { accessSuccess, accessError in
                             DispatchQueue.main.async {
-                                if accessSuccess {
+                                //if accessSuccess {
+                                print("current: \(loginID)")
+                                print("new: \(currentLoginID)")
+                                if currentLoginID.lowercased() == loginID?.lowercased(){
                                     authManager.fileAccessResultOD = "Access to OneDrive granted."
                                     AuthenticationManager.shared.fetchDirectoryContents(accessToken: token)
                                     AuthenticationManager.shared.fetchSharedItems(accessToken: token)
@@ -420,7 +493,9 @@ struct TimesheetView: View {
                                     // ✅ Only approve if authentication fully succeeds:
                                     approveOfflineCharges()
                                     offlineLogin=false
+                                    print("logged in as correct user, approving")
                                 } else {
+                                    print("failed to login as correct user, approve failed")
                                     authManager.fileAccessResult = accessError ?? "Access to OneDrive failed."
                                 }
                             }
