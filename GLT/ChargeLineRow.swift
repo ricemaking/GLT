@@ -11,6 +11,7 @@ import CoreData
 struct ChargeLineRow: View {
     // MARK: - Input Properties
     @Binding var chargeLine: ChargeLine
+    var previouslyAssignedIDs: Set<Int32>
     var day: (day: Int, weekday: String)
     var curID: Int32
     var month: Int16
@@ -35,20 +36,23 @@ struct ChargeLineRow: View {
          curID: Int32,
          month: Int16,
          year: Int16,
-         context: NSManagedObjectContext) {
+         context: NSManagedObjectContext,
+         previouslyAssignedIDs: Set<Int32>) {
         _chargeLine = chargeLine
         self.day = day
         self.curID = curID
         self.month = month
         self.year = year
         self.context = context
+        self.previouslyAssignedIDs = previouslyAssignedIDs
         _viewModel = StateObject(wrappedValue: ChargeLineRowViewModel(
             chargeLine: chargeLine.wrappedValue,
             day: day,
             curID: curID,
             month: month,
             year: year,
-            context: context))
+            context: context,
+            previouslyAssignedIDs: previouslyAssignedIDs))
     }
     
     // MARK: - View Body

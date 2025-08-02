@@ -13,6 +13,7 @@ struct DayView: View {
     var month: Int16
     var year: Int16
     var curID: Int32
+    var previouslyAssignedIDs: Set<Int32>
     @Binding var chargeLines: [ChargeLine]
     var weekends: [String]
     var context: NSManagedObjectContext
@@ -49,7 +50,8 @@ struct DayView: View {
                             curID: curID,
                             month: month,
                             year: year,
-                            context: context
+                            context: context,
+                            previouslyAssignedIDs: previouslyAssignedIDs
                         )
                     }
                 }

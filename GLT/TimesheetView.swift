@@ -74,6 +74,7 @@ struct TimesheetView: View {
     @State private var accessToken: String = ""
     @State private var jwtPayloadString: String = ""
     @State private var activeLogin: Bool = false
+    @State private var showPrev: Bool = false
     @StateObject var authManager = AuthenticationManager.shared
 
 
@@ -125,17 +126,29 @@ struct TimesheetView: View {
                                 month: month,
                                 year: year,
                                 curID: targetid,  // Use the employee id if available.
+                                previouslyAssignedIDs: Set(chargeLineHistory.map { $0.clID }),
                                 chargeLines: $chargeLines,
                                 weekends: weekends,
                                 context: managedObjectContext,
-                                cellWidth: $cellWidth  // Pass the binding for uniform dynamic width.
+                                cellWidth: $cellWidth
                             )
                         }
                     }
                     .padding(.horizontal, 12)
                 }
-                Text("ALL CHARGELINES PREVIOUSLY ASSIGNED TO:")
-                ScrollView {
+                Button(action: {
+                    showPrev.toggle()
+                }) {
+                    Text("Show All Previous Chargelines")
+                        .padding()
+                        .frame(maxWidth: 250)
+                        .background(showPrev ? .blue : .gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                        .padding(.horizontal, 4)
+                }
+                
+                if showPrev {
                     ScrollView(.horizontal) {
                         HStack(spacing: 16) {  // Spacing between day columns.
                             ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
@@ -144,6 +157,7 @@ struct TimesheetView: View {
                                     month: month,
                                     year: year,
                                     curID: targetid,  // Use the employee id if available.
+                                    previouslyAssignedIDs: Set(chargeLineHistory.map { $0.clID }),
                                     chargeLines: $chargeLineHistory,
                                     weekends: weekends,
                                     context: managedObjectContext,
@@ -151,8 +165,8 @@ struct TimesheetView: View {
                                 )
                             }
                         }
-                        .padding(.horizontal, 12)
                     }
+                    .padding(.horizontal, 12)
                 }
             }
             
@@ -251,7 +265,7 @@ struct TimesheetView: View {
 
         employee = GLTFunctions.fetchTarEmp(byID: targetid, context: managedObjectContext)
         chargeLines = GLTFunctions.fetchChargeLines(for: targetid, in: managedObjectContext)
-        chargeLineHistory = GLTFunctions.fetchAssignedOrHasHoursChargeLines(for: targetid, context: managedObjectContext)
+        chargeLineHistory = GLTFunctions.fetchAssignedOrHasHoursChargeLines(for: targetid, context: managedObjectContext).filter{!Set(chargeLines).contains($0)}
 
         if let cur = curTimesheet {
             month = Int16(cur.month)

@@ -16,6 +16,7 @@ class ChargeLineRowViewModel: ObservableObject {
     @Published var currentColor: UIColor = .gray
     
     private var chargeLine: ChargeLine
+    private var previouslyAssignedIDs: Set<Int32>
     private var curID: Int32
     private var month: Int16
     private var year: Int16
@@ -28,13 +29,15 @@ class ChargeLineRowViewModel: ObservableObject {
          curID: Int32,
          month: Int16,
          year: Int16,
-         context: NSManagedObjectContext) {
+         context: NSManagedObjectContext,
+         previouslyAssignedIDs: Set<Int32>) {
         self.chargeLine = chargeLine
         self.curID = curID
         self.month = month
         self.year = year
         self.day = day.day
         self.context = context
+        self.previouslyAssignedIDs = previouslyAssignedIDs
         updateCurrentColor()
     }
     
@@ -215,28 +218,7 @@ class ChargeLineRowViewModel: ObservableObject {
         }
     }
     
-    
-    private var assignmentWindow: (assigned: Date?, unassigned: Date?) {
-        let tsCharge = fetchTSCharge()
-//        print("ts charge:", tsCharge)
-        return (tsCharge?.dateAssigned, tsCharge?.dateUnassigned)
-    }
-
     func isDisabled() -> Bool {
-        guard let cellDate = Calendar.current.date(from: DateComponents(year: Int(year), month: Int(month), day: Int(day))) else {
-            return false
-        }
-        let (assigned, unassigned) = assignmentWindow
-        
-//        print("celldate:", cellDate)
-//        print("assignment window:", assignmentWindow)
-
-        if let assigned = assigned, cellDate < assigned {
-            return true
-        }
-        if let unassigned = unassigned, cellDate > unassigned {
-            return true
-        }
-        return false
+        return previouslyAssignedIDs.contains(chargeLine.clID)
     }
 }

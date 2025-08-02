@@ -11,6 +11,7 @@ struct CalendarView: View {
     var month: Int16
     var year: Int16
     var context: NSManagedObjectContext
+    var previouslyAssignedIDs: Set<Int32>
 
     // Provide a state for cellWidth, with a default value that may be updated dynamically.
     @State private var cellWidth: CGFloat = 110
@@ -24,6 +25,7 @@ struct CalendarView: View {
                         month: month,
                         year: year,
                         curID: curID,
+                        previouslyAssignedIDs: previouslyAssignedIDs,
                         chargeLines: $chargeLines,
                         weekends: weekends,
                         context: context,
