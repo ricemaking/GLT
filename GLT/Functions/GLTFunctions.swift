@@ -226,6 +226,23 @@ public struct GLTFunctions {
         }
         return []
     }
+    
+//    public static func fetchEmployeeIDs(for chargeLineID: Int32, in context: NSManagedObjectContext) -> [Int32] {
+//        let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
+//        
+//        fetchRequest.predicate = NSPredicate(format: "ANY chargeLine.id == %d", chargeLineID)
+//        
+//        do {
+//            let employees = try context.fetch(fetchRequest)
+//            return employees.map { $0.id }
+//        } catch {
+//            print("Error fetching employees: \(error)")
+//            return []
+//        }
+//    }
+
+
+    
     //Function to get the credential levels of the employee
     public static func fetchCredentials(requestType: String, for employeeEmail: String, in context: NSManagedObjectContext) -> Bool {
         

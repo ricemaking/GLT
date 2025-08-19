@@ -22,8 +22,9 @@ enum AppView: Hashable {
     case loginView
     case manageEmpTimesheet
     case manageEmpTimesheetList
-    //case cl2emp1
-    //case cl2emp2
+    case downloadEmpTimesheetView1
+    case cl2emp1
+    case cl2emp2
 }
 
 // Random nameFirst View
@@ -58,6 +59,7 @@ struct ContentView: View
     @State private var targetids: [Int32] = []
     @State private var timesheet: Timesheet?
     @State var selectedEmployeeIDs: [Int32] = []
+    @State var selectedChargeLineIDs: [Int32] = []
     @State var loginID: String? = "" // This is the email address input by the user at sign on, which should be utilized to identify the current employee and associated management level.
     @State private var accessToken: String = ""
     @State private var jwtPayloadString: String = ""
@@ -209,6 +211,12 @@ struct ContentView: View
                     ManageEmpTimesheet(path: $path, curEmployee: $targetid, loginID: $loginID, curTimesheet: $curTimesheet)
                 case .manageEmpTimesheetList:
                     TimesheetListView(path: $path, curEmployee: $targetid, curTimesheet: $curTimesheet, loginID: $loginID, isManagingOthers: true)
+                case .downloadEmpTimesheetView1:
+                    DownloadEmpTimesheetView1(path: $path, curEmployee: $targetid, loginID: $loginID)
+                case .cl2emp1:
+                    CL2EmpView1(path: $path, selectedChargeLineIDs: $selectedChargeLineIDs)
+                case .cl2emp2:
+                    CL2EmpView2(path: $path, selectedChargeLineIDs: $selectedChargeLineIDs)
                 }
             }
             .toolbar {

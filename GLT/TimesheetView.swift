@@ -66,7 +66,8 @@ struct TimesheetView: View {
     @State private var month: Int16 = 0
     @State private var year: Int16 = 0
     @State private var days: [(day: Int, weekday: String)] = []
-    @State private var cellWidth: CGFloat = 150  // Shared dynamic cell width (minimum 150)
+    @State private var curCellWidth: CGFloat = 150  // Shared dynamic cell width (minimum 150)
+    @State private var prevCellWidth: CGFloat = 150
     @State private var pendingOfflineTSCharges: [TSCharge] = []
     //AUTHENTICATIONS VARS
     @State private var shouldPromptForAccount: Bool = true
@@ -104,144 +105,155 @@ struct TimesheetView: View {
     var body: some View {
         VStack {
             if let curTimesheet = curTimesheet {
-                Text("Timesheet for: \(GLTFunctions.convertIntToMonth(from: Int(curTimesheet.month))), \(Int(curTimesheet.year))")
-                Text("Current Timesheet ID: \(curTimesheet.id)")
-                Text("Days in Timesheet Month: \(GLTFunctions.numberOfDaysInCurrentMonth())")
-            }
-            else {
-                Text("Select a timesheet first")
-                    .foregroundColor(.red)
-            }
-            
-            if let lastRun = previousRunTimestamp {
-                Text("Previous Run: \(lastRun, formatter: dateFormatter)")
-            }
-            
-            ScrollView {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 16) {  // Spacing between day columns.
-                        ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
-                            DayView(
-                                day: day,
-                                month: month,
-                                year: year,
-                                curID: targetid,  // Use the employee id if available.
-                                previouslyAssignedIDs: Set(chargeLineHistory.map { $0.clID }),
-                                chargeLines: $chargeLines,
-                                weekends: weekends,
-                                context: managedObjectContext,
-                                cellWidth: $cellWidth
-                            )
-                        }
+                VStack {
+                    Text("Timesheet for: \(GLTFunctions.convertIntToMonth(from: Int(curTimesheet.month))), \(Int(curTimesheet.year))")
+                    Text("Current Timesheet ID: \(curTimesheet.id)")
+                    Text("Days in Timesheet Month: \(GLTFunctions.numberOfDaysInCurrentMonth())")
+                    
+                    if let lastRun = previousRunTimestamp {
+                        Text("Previous Run: \(lastRun, formatter: dateFormatter)")
                     }
-                    .padding(.horizontal, 12)
-                }
-                Button(action: {
-                    showPrev.toggle()
-                }) {
-                    Text("Show All Previous Chargelines")
-                        .padding()
-                        .frame(maxWidth: 250)
-                        .background(showPrev ? .blue : .gray)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                        .padding(.horizontal, 4)
-                }
-                
-                if showPrev {
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 16) {  // Spacing between day columns.
-                            ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
-                                DayView(
-                                    day: day,
-                                    month: month,
-                                    year: year,
-                                    curID: targetid,  // Use the employee id if available.
-                                    previouslyAssignedIDs: Set(chargeLineHistory.map { $0.clID }),
-                                    chargeLines: $chargeLineHistory,
-                                    weekends: weekends,
-                                    context: managedObjectContext,
-                                    cellWidth: $cellWidth  // Pass the binding for uniform dynamic width.
-                                )
+                    
+                    ScrollView {
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 16) {
+                                ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
+                                    DayView(
+                                        day: day,
+                                        month: month,
+                                        year: year,
+                                        curID: targetid,
+                                        previouslyAssignedIDs: Set(chargeLineHistory.map { $0.clID }),
+                                        chargeLines: $chargeLines,
+                                        weekends: weekends,
+                                        context: managedObjectContext,
+                                        cellWidth: $curCellWidth
+                                    )
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                        }
+                        
+                        Button(action: {
+                            showPrev.toggle()
+                        }) {
+                            Text("Show All Previous Chargelines")
+                                .padding()
+                                .frame(maxWidth: 250)
+                                .background(showPrev ? .blue : .gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                                .padding(.horizontal, 4)
+                        }
+                        
+                        if showPrev {
+                            if chargeLineHistory.isEmpty {
+                                Text("No previous charge lines to display.")
+                                    .foregroundColor(.secondary)
+                                    .padding(.vertical, 8)
+                            } else {
+                                ScrollView(.horizontal) {
+                                    HStack(spacing: 16) {
+                                        ForEach(days, id: \.day) { (day: (day: Int, weekday: String)) in
+                                            DayView(
+                                                day: day,
+                                                month: month,
+                                                year: year,
+                                                curID: targetid,
+                                                previouslyAssignedIDs: Set(chargeLineHistory.map { $0.clID }),
+                                                chargeLines: $chargeLineHistory,
+                                                weekends: weekends,
+                                                context: managedObjectContext,
+                                                cellWidth: $prevCellWidth
+                                            )
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 12)
                             }
                         }
                     }
-                    .padding(.horizontal, 12)
-                }
-            }
-            
-            // Bottom area: Save and Submit buttons.
-            HStack {
-                Button(action: {
-                    saveAllChargeLines()
-                }) {
-                    Text("Save Hours")
-                        .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                        .padding(.horizontal, 4)
-                }
-                
-                Button(action: {
-                    submitTimesheet()
-                }) {
-                    Text("Submit Timesheet")
-                        .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                        .padding(.horizontal, 4)
-                }
-            }
-            .padding(.vertical, 8)
-            /*
-            if !pendingOfflineTSCharges.isEmpty {
-                Text("Offline Changes Detected")
-                    .font(.headline)
+                    
+                    // Bottom area: Save and Submit buttons.
+                    HStack {
+                        Button(action: {
+                            saveAllChargeLines()
+                        }) {
+                            Text("Save Hours")
+                                .font(.headline)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                                .padding(.horizontal, 4)
+                        }
+                        Button(action: {
+                            submitTimesheet()
+                        }) {
+                            Text("Submit Timesheet")
+                                .font(.headline)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                                .padding(.horizontal, 4)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    /*
+                    if !pendingOfflineTSCharges.isEmpty {
+                        Text("Offline Changes Detected")
+                            .font(.headline)
 
-                List {
-                    ForEach(pendingOfflineTSCharges, id: \.objectID) { charge in
-                        VStack(alignment: .leading) {
-                            Text("Date: \(charge.month)/\(charge.day)/\(charge.year)")
-                            Text("Hours: \(charge.hours)")
-                            Text("Charge ID: \(charge.chargeID)")
-                            Text("Version:  \(charge.version)")
+                        List {
+                            ForEach(pendingOfflineTSCharges, id: \.objectID) { charge in
+                                VStack(alignment: .leading) {
+                                    Text("Date: \(charge.month)/\(charge.day)/\(charge.year)")
+                                    Text("Hours: \(charge.hours)")
+                                    Text("Charge ID: \(charge.chargeID)")
+                                    Text("Version:  \(charge.version)")
+                                }
+                            }
+                        }
+        */
+                        
+                    //}
+                     
+                    
+
+                    if !pendingOfflineTSCharges.isEmpty {
+                        Text("Offline Changes Detected")
+                            .font(.headline)
+
+                        OfflineChangesTabView(sortedKeys: sortedKeys, groupedCharges: groupedCharges)
+                        HStack {
+                            Button("Approve") {
+                                //authenticateAndApproveChanges()
+                                approveOfflineCharges()
+                            }
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+
+                            Button("Deny") {
+                                denyOfflineCharges()
+                            }
+                            .padding()
+                            .background(Color.red)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
                     }
                 }
-*/
+            } else {
+                Text("Select a timesheet first")
+                    .foregroundColor(.red)
                 
-            //}
-             
-            
-
-            if !pendingOfflineTSCharges.isEmpty {
-                Text("Offline Changes Detected")
-                    .font(.headline)
-
-                OfflineChangesTabView(sortedKeys: sortedKeys, groupedCharges: groupedCharges)
-                HStack {
-                    Button("Approve") {
-                        //authenticateAndApproveChanges()
-                        approveOfflineCharges()
-                    }
-                    .padding()
-                    .background(Color.green)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-
-                    Button("Deny") {
-                        denyOfflineCharges()
-                    }
-                    .padding()
-                    .background(Color.red)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
+                if let lastRun = previousRunTimestamp {
+                    Text("Previous Run: \(lastRun, formatter: dateFormatter)")
                 }
             }
         }
@@ -275,6 +287,12 @@ struct TimesheetView: View {
             welcomeMessage = "Error: Timesheet data unavailable"
         }
     }
+    
+//    private func handleShowPrev() {
+//        if !chargeLineHistory.isEmpty {
+//            showPrev.toggle()
+//        }
+//    }
 
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -445,12 +463,29 @@ struct TimesheetView: View {
                 }
             }
                      
-            //display changes
-            //get verification
-            //change all changes from offline=true to offline=false
         }
     }
     
+    private func generateAndSaveCSV(for charges: [TSCharge], employeeID: Int32, month: Int16, year: Int16) throws {
+        var csvText = "Day,ChargeID,Hours,Work Performed,Version\n"
+
+        for charge in charges {
+            let day = charge.day
+            let chargeID = charge.chargeID
+            let hours = charge.hours ?? 0
+            let workPerformed = charge.workPerformed ?? ""
+            let version = charge.version
+            csvText.append("\(day),\(chargeID),\(hours),\(workPerformed), \(version)\n")
+        }
+
+        let fileName = "Timesheet_\(employeeID)_\(month)_\(year).csv"
+        let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(fileName)
+
+        try csvText.write(to: fileURL, atomically: true, encoding: .utf8)
+        NSLog("CSV saved at \(fileURL)")
+    }
+
     private func submitTimesheet() {
         managedObjectContext.perform {
             let currentEmpID = targetid
@@ -475,11 +510,15 @@ struct TimesheetView: View {
                 try managedObjectContext.save()
                 managedObjectContext.refreshAllObjects()
                 NSLog("Successfully submitted timesheet and saved all TSCharge hours.")
+
+                try self.generateAndSaveCSV(for: tsCharges, employeeID: currentEmpID, month: month, year: year)
+
             } catch {
                 NSLog("Error submitting timesheet: \(error.localizedDescription)")
             }
         }
     }
+
     
     private func authenticateAndApproveChanges() {
         print("current: \(loginID)")
