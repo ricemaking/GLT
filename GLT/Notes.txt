@@ -1,0 +1,17 @@
+//
+//  Notes.txt
+//  GLT
+//
+//  Created by Player_1 on 3/8/25.
+//
+/*
+Last focus was refining the timesheet view page and tying all the core databases together to ensure that each employee could create timesheets, which had an automated deterministic function that checked to see where they were in the month and
+1. started the dateStart at the first of that month,
+2. calculatted and set dateEnd to the last of the month
+3. calculated how many days were in the month
+4. calculated how many holidays were in the month
+
+//Need to add int32 result of employee to a state variable of the ContentView so it can be referenced for employee specific records access.
+
+//Need a function that takes in a specific date and determines what the first date of that month is.
+*/
