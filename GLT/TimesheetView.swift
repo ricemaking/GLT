@@ -119,7 +119,7 @@ struct TimesheetView: View {
                                 day: day,
                                 month: month,
                                 year: year,
-                                curID: targetid,  // Use the employee id if available.
+                                curID: employee?.id ?? 0,  // Use the employee id if available.
                                 chargeLines: $chargeLines,
                                 weekends: weekends,
                                 context: managedObjectContext,
@@ -188,8 +188,8 @@ struct TimesheetView: View {
                 OfflineChangesTabView(sortedKeys: sortedKeys, groupedCharges: groupedCharges)
                 HStack {
                     Button("Approve") {
-                        //authenticateAndApproveChanges()
-                        approveOfflineCharges()
+                        authenticateAndApproveChanges()
+                        //approveOfflineCharges()
                     }
                     .padding()
                     .background(Color.green)
@@ -224,8 +224,8 @@ struct TimesheetView: View {
             return
         }
 
-        employee = GLTFunctions.fetchTarEmp(byID: targetid, context: managedObjectContext)
-        chargeLines = GLTFunctions.fetchChargeLines(for: targetid, in: managedObjectContext)
+        employee = GLTFunctions.fetchTarEmp(byID: empID, context: managedObjectContext)
+        chargeLines = GLTFunctions.fetchChargeLines(for: empID, in: managedObjectContext)
 
         if let cur = curTimesheet {
             month = Int16(cur.month)
@@ -248,7 +248,7 @@ struct TimesheetView: View {
     private func saveAllChargeLines() {
         if hasInternetConnection() && offlineLogin == false{
             managedObjectContext.perform {
-                let currentEmpID = targetid
+                let currentEmpID = employee?.id ?? 0
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO", currentEmpID, month, year)
                 do {
@@ -261,6 +261,8 @@ struct TimesheetView: View {
                             tsCharge.saved = true
                             tsCharge.dateSaved = Date()
                             tsCharge.offline = false
+                            tsCharge.verified = true
+                            tsCharge.denied = false
                             print("marked tsCharge as saved online, version: \(tsCharge.version)")
                             //version?
                             let newTSCharge = TSCharge(context: managedObjectContext)
@@ -295,7 +297,7 @@ struct TimesheetView: View {
             offlineLogin=true
             print("offline login true, no internet connection")
              managedObjectContext.perform {
-                 let currentEmpID = targetid
+                 let currentEmpID = employee?.id ?? 0
                  let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                  fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO AND denied == NO", currentEmpID, month, year)
                  print("fetched charges")
@@ -342,7 +344,50 @@ struct TimesheetView: View {
         }
         else if hasInternetConnection() && offlineLogin == true{
             managedObjectContext.perform {
-                let currentEmpID = targetid
+                let currentEmpID = employee?.id ?? 0
+                let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO", currentEmpID, month, year)
+                do {
+                    let tsCharges = try managedObjectContext.fetch(fetchRequest) //fetch all unsaved tscharges
+                    
+                    for tsCharge in tsCharges {
+                        if let tempHours = tsCharge.tempHours, tsCharge.tempHours != tsCharge.hours{
+                            tsCharge.hours = tempHours
+                            //tsCharge.tempHours = nil
+                            tsCharge.saved = true
+                            tsCharge.dateSaved = Date()
+                            tsCharge.offline = false
+                            print("marked tsCharge as saved online, version: \(tsCharge.version)")
+                            //version?
+                            let newTSCharge = TSCharge(context: managedObjectContext)
+                            newTSCharge.employeeID = tsCharge.employeeID
+                            newTSCharge.chargeID = tsCharge.chargeID
+                            newTSCharge.month = tsCharge.month
+                            newTSCharge.year = tsCharge.year
+                            newTSCharge.day = tsCharge.day
+                            newTSCharge.tempHours = tsCharge.tempHours
+                            newTSCharge.saved = false
+                            newTSCharge.hours = tsCharge.tempHours
+                            newTSCharge.version = tsCharge.version + 1
+                            newTSCharge.offline = false
+                            newTSCharge.verified = true
+                            print("created new online tsCharge, version: \(newTSCharge.version)")
+                            do {
+                                try managedObjectContext.save()
+                            } catch {
+                                print("Error saving new TSCharge: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                    try managedObjectContext.save()
+                    managedObjectContext.refreshAllObjects()
+                    NSLog("Successfully saved all TSCharge hours, marking them as saved.")
+                } catch {
+                    NSLog("Error saving TSCharge: \(error.localizedDescription)")
+                }
+            }
+            managedObjectContext.perform {
+                let currentEmpID = employee?.id ?? 0
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "employeeID==%d AND offline==YES AND saved==YES AND verified == NO", currentEmpID)
                 fetchRequest.sortDescriptors = [
@@ -350,7 +395,6 @@ struct TimesheetView: View {
                     NSSortDescriptor(key: "chargeID", ascending: true),
                     NSSortDescriptor(key: "version", ascending: true)
                 ]
-
                         
                 do {
                     let tsCharges = try managedObjectContext.fetch(fetchRequest) //fetch all unsaved tscharges
@@ -371,7 +415,7 @@ struct TimesheetView: View {
     
     private func submitTimesheet() {
         managedObjectContext.perform {
-            let currentEmpID = targetid
+            let currentEmpID = employee?.id ?? 0
             let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d", currentEmpID, month, year)
             
@@ -400,19 +444,24 @@ struct TimesheetView: View {
     }
     
     private func authenticateAndApproveChanges() {
+        print("current: \(loginID)")
+
         AuthenticationManager.shared.signIn(shouldPromptForAccount: shouldPromptForAccount, revokeRequest: revokeRequest) { success, error in
             if success {
                 AuthenticationManager.shared.acquireTokenSilently { token, silentError in
                     if let token = token {
                         accessToken = token
                         jwtPayloadString = AuthenticationManager.shared.extractJWTPayloadString(from: token) ?? "Unknown jwtPayloadString"
-                        loginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
+                        let currentLoginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
                         activeLogin = true
                         revokeRequest = false
                         
                         AuthenticationManager.shared.checkOneDriveAccess(accessToken: token) { accessSuccess, accessError in
                             DispatchQueue.main.async {
-                                if accessSuccess {
+                                //if accessSuccess {
+                                print("current: \(loginID)")
+                                print("new: \(currentLoginID)")
+                                if currentLoginID.lowercased() == loginID?.lowercased(){
                                     authManager.fileAccessResultOD = "Access to OneDrive granted."
                                     AuthenticationManager.shared.fetchDirectoryContents(accessToken: token)
                                     AuthenticationManager.shared.fetchSharedItems(accessToken: token)
@@ -420,7 +469,9 @@ struct TimesheetView: View {
                                     // ✅ Only approve if authentication fully succeeds:
                                     approveOfflineCharges()
                                     offlineLogin=false
+                                    print("logged in as correct user, approving")
                                 } else {
+                                    print("failed to login as correct user, approve failed")
                                     authManager.fileAccessResult = accessError ?? "Access to OneDrive failed."
                                 }
                             }
@@ -443,6 +494,8 @@ struct TimesheetView: View {
                 charge.offline = false
                 charge.verified = true
                 print("approved day \(charge.day): \(charge.hours ?? 0) hours, \(charge.tempHours ?? 0) tempHours, offline: \(charge.offline), verified: \(charge.verified), denied: \(charge.denied), saved: \(charge.saved)")
+                
+                //also push to cloud db
             }
             do {
                 try managedObjectContext.save()

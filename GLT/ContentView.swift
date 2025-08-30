@@ -4,6 +4,14 @@ import Foundation
 import MSAL
 import os.log
 
+//backend python func to fetch latest ___ in cloud db (azure)
+//compares to latest in local db
+
+//other func
+//if local db != coud db
+//update local db (GET)
+
+
 // Define an enum for your views
 enum AppView: Hashable {
     case employee
@@ -265,6 +273,7 @@ struct ContentView: View
                                                         loginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
                                                         activeLogin = true
                                                         revokeRequest = false
+                                                        
                                                         AuthenticationManager.shared.checkOneDriveAccess(accessToken: token) { accessSuccess, accessError in
                                                             DispatchQueue.main.async {
                                                                 if accessSuccess {
@@ -287,17 +296,32 @@ struct ContentView: View
                                             }
                                             else
                                             {
+                                                offlineLogin=true
                                                 activeLogin = false
-                                                // include code here to prmopt for offline login
-                                                
-                                                //
                                             }
                                         }
+                                        
                                     }
                                     else {
-                                        print(loginID)
-                                        activeLogin = true
+                                        //add an if to identify if its because of network error
+                                        guard let enteredEmail = loginID?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else {
+                                            message = "Invalid email."
+                                            return
+                                        }
+
+                                        let found = employees.contains { employee in
+                                            (employee.email?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? "") == enteredEmail
+                                        }
+
+                                        if found {
+                                            activeLogin = true
+                                            message = "Offline login successful."
+                                        } else {
+                                            activeLogin = false
+                                            message = "Email not found for offline login."
+                                        }
                                     }
+
                                 }
                                 Toggle("Account Selection Prompt", isOn: $shouldPromptForAccount)
                                     .fontDesign(.monospaced)
@@ -311,7 +335,7 @@ struct ContentView: View
                             .bold()
                             .foregroundColor(Color(hex: "FF6600"))
                             
-                            HStack {
+                            /*HStack {
                                 Toggle("Offline Login", isOn: $offlineLogin)
                                     .fontDesign(.monospaced)
                                     .font(.system(size: 18))
@@ -323,6 +347,8 @@ struct ContentView: View
                             .textCase(.uppercase)
                             .bold()
                             .foregroundColor(Color(hex: "FF6600"))
+                             */
+                             
                         }
                     }
                 }
@@ -333,6 +359,7 @@ struct ContentView: View
             for employee in employees {
                 print(employee.email ?? "No email")
             }
+             
             
             AuthenticationManager.shared.acquireTokenSilently { token, silentError in
                 if let token = token {
@@ -348,8 +375,8 @@ struct ContentView: View
                     activeLogin = false
                 }
             }
+             
         }
     }
 }
-
 

@@ -8,6 +8,100 @@
 import Foundation
 import CoreData
 import SwiftUI
+import Security
+
+
+//url session functions:
+
+class ClientCertificateAuth: NSObject, URLSessionDelegate {
+    private let identity: SecIdentity
+    private let certs: [SecCertificate]
+
+    init?(p12Name: String, p12Password: String) {
+        guard let path = Bundle.main.path(forResource: p12Name, ofType: "p12"),
+              let p12Data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+            print("❌ Could not find p12 file in bundle")
+            return nil
+        }
+        
+        var importResult: CFArray?
+        let options: NSDictionary = [kSecImportExportPassphrase as NSString: p12Password]
+        
+        let status = SecPKCS12Import(p12Data as NSData, options, &importResult)
+        guard status == errSecSuccess,
+              let items = importResult as? [[String: Any]],
+              let certArray = items[0][kSecImportItemCertChain as String] as? [SecCertificate] else {
+            print("❌ Failed to import p12: \(status)")
+            return nil
+        }
+        
+        // 🔑 No optional binding here — just force cast because SecIdentity is guaranteed if key exists
+        let identity = items[0][kSecImportItemIdentity as String] as! SecIdentity
+        
+        self.identity = identity
+        self.certs = certArray
+    }
+
+
+
+    // 🔑 Handle TLS handshake and provide client cert
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate {
+            let credential = URLCredential(identity: identity, certificates: certs, persistence: .forSession)
+            completionHandler(.useCredential, credential)
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
+    }
+}
+
+
+
+/*******************************/
+struct EmployeePayload: Codable {
+    let id: Int
+    let firstName: String
+    let lastName: String
+    let phone: String
+    let email: String
+    let dob: String
+
+    let city: String
+    let state: String
+    let streetAddress: String
+    let zipcode: String
+
+    let startDate: String
+    let endDate: String?
+
+    let clearanceLevel: String
+    let authenticated: Bool
+    let chargeline_ids: [Int]
+    let timesheet_ids: [Int]
+}
+
+struct ChargelinePayload: Codable {
+    let id: Int
+    let name: String
+    let clCap: Decimal
+    let clFunded: Decimal
+    let startDate: String?
+    let endDate: String?
+}
+
+struct TimesheetPayload: Codable{
+    let id: Int
+    let employeeID: Int
+    let month: Int
+    let year: Int
+    let dateCreated: String
+    let dateSubmitted: String?
+    let submitted: Bool
+    let enabled: Bool
+    let version: Int
+}
+
 
 public struct GLTFunctions {
     
@@ -15,7 +109,9 @@ public struct GLTFunctions {
     public static func addEmployee(nameFirst: String, nameLast: String, dob: String, endDate: Date? = nil, email: String, phone: String, streetAddress: String, city: String, state: String, startDate: Date? = Date(), zipCode: String, clearanceLevel: String, context: NSManagedObjectContext){
         let newEmployee = Employee(context: context)
         let highestID = fetchHighestEmployeeID(context: context)
-        newEmployee.id = highestID + 1
+        let newID = highestID + 1
+                
+        newEmployee.id = newID
         newEmployee.nameFirst = nameFirst
         newEmployee.nameLast = nameLast
         newEmployee.email = email
@@ -36,10 +132,85 @@ public struct GLTFunctions {
             print("Employee added successfully")
         } catch {
             print("Failed to save the new employee: \(error)")
+            return
         }
-    }
+        // Step 2: Prepare data for backend API
+        //let dateFormatter = ISO8601DateFormatter()
+        let simpleDateFormatter = DateFormatter()
+        simpleDateFormatter.dateFormat = "yyyy-MM-dd"
+        simpleDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+                
+        //let dobFormatted = dob // make sure this is already in "yyyy-MM-dd" or convert from Date
+
+        let startDateString = startDate != nil ? simpleDateFormatter.string(from: startDate!) : ""
+        let endDateString = endDate != nil ? simpleDateFormatter.string(from: endDate!) : nil
+
+
+                
+                // For authenticated, chargeline_ids, and timesheet_ids, fill with default values or adapt as needed
+        let employeePayload = EmployeePayload(
+            id: Int(newID),
+            firstName: nameFirst,
+            lastName: nameLast,
+            phone: phone,
+            email: email,
+            dob: dob, // Assuming this is a string already formatted properly
+                    
+            city: city,
+            state: state,
+            streetAddress: streetAddress,
+            zipcode: zipCode,
+                
+            startDate: startDateString,
+            endDate: endDateString,
+            
+            clearanceLevel: clearanceLevel,
+            authenticated: true, // or false depending on your logic
+                    
+            chargeline_ids: [],
+            timesheet_ids: []
+        )
+        //on server:
+        guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+            print("❌ Failed to load client certificate")
+            return
+        }
+
+        let config = URLSessionConfiguration.default
+        let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
+
+        guard let url = URL(string: "https://glt.glintlock.com/employees/") else {
+            print("Invalid URL")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let jsonData = try JSONEncoder().encode(employeePayload)
+            request.httpBody = jsonData
+        } catch {
+            print("Failed to encode employee for backend: \(error)")
+            return
+        }
+
+        session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Backend POST failed: \(error)")
+                return
+            }
+            if let data = data {
+                print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
+            }
+        }.resume()
+
+        }
     
     // Function to add a new employee
+    
     public static func addChargeLine(clName: String, clCap: NSDecimalNumber, clFunded: NSDecimalNumber, clDateStart: String, clDateEnd: String, context: NSManagedObjectContext) {
         let newCL = ChargeLine(context: context)
         let highestID = fetchHighestCLID(context: context)
@@ -56,6 +227,66 @@ public struct GLTFunctions {
         } catch {
             print("Failed to save the new employee: \(error)")
         }
+        let simpleDateFormatter = DateFormatter()
+        simpleDateFormatter.dateFormat = "yyyy-MM-dd"
+        simpleDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+                
+        //let dobFormatted = dob // make sure this is already in "yyyy-MM-dd" or convert from Date
+
+        //let startDateString = clDateStart != nil ? simpleDateFormatter.string(from: clDateStart!) : nil
+        //let endDateString = clDateEnd != nil ? simpleDateFormatter.string(from: clDateEnd!) : nil
+
+
+                
+                // For authenticated, chargeline_ids, and timesheet_ids, fill with default values or adapt as needed
+        let chargelinePayload = ChargelinePayload(
+            id: Int(highestID) + 1,
+            name: clName,
+            clCap: clCap as Decimal,
+            clFunded: clFunded as Decimal,   // ✅ renamed here
+            startDate: clDateStart,
+            endDate: clDateEnd
+        )
+
+        //on server:
+        guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+            print("❌ Failed to load client certificate")
+            return
+        }
+
+        let config = URLSessionConfiguration.default
+        let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
+
+        guard let url = URL(string: "https://glt.glintlock.com/chargelines/") else {
+            print("Invalid URL")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let jsonData = try JSONEncoder().encode(chargelinePayload)
+            request.httpBody = jsonData
+        } catch {
+            print("Failed to encode chargeline for backend: \(error)")
+            return
+        }
+
+        session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Backend POST failed: \(error)")
+                return
+            }
+            if let httpResponse = response as? HTTPURLResponse {
+                    print("🌐 Backend status code: \(httpResponse.statusCode)")
+                }
+            if let data = data {
+                print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
+            }
+        }.resume()
     }
     
     public static func addTimesheet(byID targetid: Int32, month: Int16? = nil, year: Int16? = nil, context: NSManagedObjectContext) -> Timesheet? {
@@ -83,6 +314,65 @@ public struct GLTFunctions {
             return nil
         }
         //return newTS2
+        // Step 2: Prepare data for backend API
+        //let dateFormatter = ISO8601DateFormatter()
+        let simpleDateFormatter = DateFormatter()
+        simpleDateFormatter.dateFormat = "yyyy-MM-dd"
+        simpleDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+        let newDateCreated = newTS.dateCreated != nil ? simpleDateFormatter.string(from: newTS.dateCreated!) : nil
+        //let endDateString = clDateEnd != nil ? simpleDateFormatter.string(from: clDateEnd!) : nil
+        //let dobFormatted = dob // make sure this is already in "yyyy-MM-dd" or convert from Date
+
+
+                
+                // For authenticated, chargeline_ids, and timesheet_ids, fill with default values or adapt as needed
+        let timesheetPayload = TimesheetPayload(
+            id: Int(newTS.id),
+            employeeID: Int(newTS.employeeID),
+            month: Int(newTS.month),
+            year: Int(newTS.year),
+            dateCreated: newTS.dateCreated,
+            dateSubmitted: newTS.dateSubmitted,
+            submitted: newTS.submitted,
+            enabled: newTS.enabled,
+            version: Int(newTS.version)
+        )
+        //on server:
+        guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+            print("❌ Failed to load client certificate")
+            return
+        }
+
+        let config = URLSessionConfiguration.default
+        let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
+
+        guard let url = URL(string: "https://glt.glintlock.com/timesheets/") else {
+            print("Invalid URL")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let jsonData = try JSONEncoder().encode(employeePayload)
+            request.httpBody = jsonData
+        } catch {
+            print("Failed to encode timesheet for backend: \(error)")
+            return
+        }
+
+        session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Backend POST failed: \(error)")
+                return
+            }
+            if let data = data {
+                print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
+            }
+        }.resume()
     }
     
     public static func addTimesheetCharge(clName: String, clCap: NSDecimalNumber, clFunded: NSDecimalNumber, clDateStart: String, clDateEnd: String, context: NSManagedObjectContext) {
@@ -101,7 +391,10 @@ public struct GLTFunctions {
         } catch {
             print("Failed to save the new employee: \(error)")
         }
+        
     }
+    
+    
     
     
     //Convert Date to a string.  Date must be in dd/MM/yyyy HH:mm:ss format
