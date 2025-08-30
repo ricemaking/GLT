@@ -81,13 +81,14 @@ struct EmployeePayload: Codable {
     let timesheet_ids: [Int]
 }
 
-struct ChargelinePayload: Codable {
-    let id: Int
+struct ChargeLinePayload: Codable {
+    let id: Int32
     let name: String
-    let clCap: Decimal
-    let clFunded: Decimal
-    let startDate: String?
-    let endDate: String?
+    let cap: Decimal
+    let funded: Decimal
+    let dateStart: String
+    let dateEnd: String
+    let employee_ids: [Int]?
 }
 
 struct TimesheetPayload: Codable{
@@ -95,8 +96,8 @@ struct TimesheetPayload: Codable{
     let employeeID: Int
     let month: Int
     let year: Int
-    let dateCreated: String
-    let dateSubmitted: String?
+    let dateCreated: Date?
+    let dateSubmitted: Date?
     let submitted: Bool
     let enabled: Bool
     let version: Int
@@ -213,167 +214,161 @@ public struct GLTFunctions {
     
     public static func addChargeLine(clName: String, clCap: NSDecimalNumber, clFunded: NSDecimalNumber, clDateStart: String, clDateEnd: String, context: NSManagedObjectContext) {
         let newCL = ChargeLine(context: context)
-        let highestID = fetchHighestCLID(context: context)
-        newCL.clID = highestID + 1
-        newCL.clName = clName
-        newCL.clCap = clCap
-        newCL.clFunded = clFunded
-        newCL.clDateStart = clDateStart
-        newCL.clDateEnd = clDateEnd
-        
-        do {
-            try context.save()
-            print("Employee added successfully")
-        } catch {
-            print("Failed to save the new employee: \(error)")
-        }
-        let simpleDateFormatter = DateFormatter()
-        simpleDateFormatter.dateFormat = "yyyy-MM-dd"
-        simpleDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            // Auto-increment ID locally or fetch highest for Core Data purposes
+            let highestID = fetchHighestCLID(context: context)
+            newCL.clID = highestID + 1
+            newCL.clName = clName
+            newCL.clCap = clCap
+            newCL.clFunded = clFunded
+            newCL.clDateStart = clDateStart
+            newCL.clDateEnd = clDateEnd
+            
+            do {
+                try context.save()
+                print("✅ ChargeLine saved locally")
+            } catch {
+                print("❌ Failed to save locally: \(error)")
+            }
+            
+            
+            let payload = ChargeLinePayload(
+                id: highestID + 1,
+                name: clName,
+                cap: clCap as Decimal,
+                funded: clFunded as Decimal,
+                dateStart: clDateStart,
+                dateEnd: clDateEnd,
+                employee_ids: nil
+            )
 
-                
-        //let dobFormatted = dob // make sure this is already in "yyyy-MM-dd" or convert from Date
-
-        //let startDateString = clDateStart != nil ? simpleDateFormatter.string(from: clDateStart!) : nil
-        //let endDateString = clDateEnd != nil ? simpleDateFormatter.string(from: clDateEnd!) : nil
-
-
-                
-                // For authenticated, chargeline_ids, and timesheet_ids, fill with default values or adapt as needed
-        let chargelinePayload = ChargelinePayload(
-            id: Int(highestID) + 1,
-            name: clName,
-            clCap: clCap as Decimal,
-            clFunded: clFunded as Decimal,   // ✅ renamed here
-            startDate: clDateStart,
-            endDate: clDateEnd
-        )
-
-        //on server:
-        guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
-            print("❌ Failed to load client certificate")
-            return
-        }
-
-        let config = URLSessionConfiguration.default
-        let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
-
-        guard let url = URL(string: "https://glt.glintlock.com/chargelines/") else {
-            print("Invalid URL")
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            let jsonData = try JSONEncoder().encode(chargelinePayload)
-            request.httpBody = jsonData
-        } catch {
-            print("Failed to encode chargeline for backend: \(error)")
-            return
-        }
-
-        session.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Backend POST failed: \(error)")
+            
+            // --- 3. Send POST request to Go backend ---
+            guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+                print("❌ Failed to load client certificate")
                 return
             }
-            if let httpResponse = response as? HTTPURLResponse {
+            
+            let config = URLSessionConfiguration.default
+            let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
+            
+            guard let url = URL(string: "https://glt.glintlock.com/chargelines") else {
+                print("❌ Invalid URL")
+                return
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            do {
+                request.httpBody = try JSONEncoder().encode(payload)
+            } catch {
+                print("❌ Failed to encode payload: \(error)")
+                return
+            }
+            
+            session.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("❌ Backend POST failed: \(error)")
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse {
                     print("🌐 Backend status code: \(httpResponse.statusCode)")
                 }
-            if let data = data {
-                print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
-            }
-        }.resume()
+                if let data = data {
+                    print("📦 Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
+                }
+            }.resume()
     }
     
-    public static func addTimesheet(byID targetid: Int32, month: Int16? = nil, year: Int16? = nil, context: NSManagedObjectContext) -> Timesheet? {
+    public static func addTimesheet(byID targetID: Int32, month: Int16? = nil, year: Int16? = nil, context: NSManagedObjectContext) -> Timesheet? {
         let newTS = Timesheet(context: context)
-        let predicate = NSPredicate(format: "id == %d", targetid)
         let EMPfetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
-        let highestID = fetchHighestTSID(context: context)
-        newTS.version = 0
-        newTS.id = highestID + 1
-        newTS.enabled = true
-        newTS.dateSubmitted = nil
-        newTS.dateCreated = Date()
-        newTS.submitted = false
-        newTS.year = year ?? Int16(fetchCurYear())
-        newTS.month = month ?? Int16(fetchCurMonth())
-        EMPfetchRequest.predicate = predicate
+        EMPfetchRequest.predicate = NSPredicate(format: "id == %d", targetID)
+        
         do {
             let employees = try context.fetch(EMPfetchRequest)
-            let employee = employees[0]
-            employee.addToTimesheet(newTS)
+            guard let employee = employees.first else {
+                print("❌ Employee not found")
+                return nil
+            }
+            
+            // Assign Timesheet values
+            let highestID = fetchHighestTSID(context: context)
+            newTS.id = highestID + 1
+            newTS.version = 0
+            newTS.enabled = true
+            newTS.submitted = false
+            newTS.dateCreated = Date()
+            newTS.dateSubmitted = nil
+            newTS.month = month ?? Int16(fetchCurMonth())
+            newTS.year = year ?? Int16(fetchCurYear())
             newTS.employeeID = employee.id
+            employee.addToTimesheet(newTS)
+            
             try context.save()
+            
+            // Prepare payload for backend
+            let timesheetPayload = TimesheetPayload(
+                id: Int(newTS.id),
+                employeeID: Int(newTS.employeeID),
+                month: Int(newTS.month),
+                year: Int(newTS.year),
+                dateCreated: newTS.dateCreated,
+                dateSubmitted: newTS.dateSubmitted,
+                submitted: newTS.submitted,
+                enabled: newTS.enabled,
+                version: Int(newTS.version)
+            )
+            
+            // Client certificate auth
+            guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+                print("❌ Failed to load client certificate")
+                return newTS
+            }
+            
+            let config = URLSessionConfiguration.default
+            let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
+            
+            guard let url = URL(string: "https://glt.glintlock.com/timesheets/") else {
+                print("Invalid URL")
+                return newTS
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            request.httpBody = try encoder.encode(timesheetPayload)
+            
+            session.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Backend POST failed: \(error)")
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("🌐 Backend status code: \(httpResponse.statusCode)")
+                }
+                if let data = data {
+                    print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
+                }
+            }.resume()
+            
             return newTS
+            
         } catch {
+            print("❌ Failed to add timesheet: \(error)")
             return nil
         }
-        //return newTS2
-        // Step 2: Prepare data for backend API
-        //let dateFormatter = ISO8601DateFormatter()
-        let simpleDateFormatter = DateFormatter()
-        simpleDateFormatter.dateFormat = "yyyy-MM-dd"
-        simpleDateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-
-        let newDateCreated = newTS.dateCreated != nil ? simpleDateFormatter.string(from: newTS.dateCreated!) : nil
-        //let endDateString = clDateEnd != nil ? simpleDateFormatter.string(from: clDateEnd!) : nil
-        //let dobFormatted = dob // make sure this is already in "yyyy-MM-dd" or convert from Date
-
-
-                
-                // For authenticated, chargeline_ids, and timesheet_ids, fill with default values or adapt as needed
-        let timesheetPayload = TimesheetPayload(
-            id: Int(newTS.id),
-            employeeID: Int(newTS.employeeID),
-            month: Int(newTS.month),
-            year: Int(newTS.year),
-            dateCreated: newTS.dateCreated,
-            dateSubmitted: newTS.dateSubmitted,
-            submitted: newTS.submitted,
-            enabled: newTS.enabled,
-            version: Int(newTS.version)
-        )
-        //on server:
-        guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
-            print("❌ Failed to load client certificate")
-            return
-        }
-
-        let config = URLSessionConfiguration.default
-        let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
-
-        guard let url = URL(string: "https://glt.glintlock.com/timesheets/") else {
-            print("Invalid URL")
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        do {
-            let jsonData = try JSONEncoder().encode(employeePayload)
-            request.httpBody = jsonData
-        } catch {
-            print("Failed to encode timesheet for backend: \(error)")
-            return
-        }
-
-        session.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("Backend POST failed: \(error)")
-                return
-            }
-            if let data = data {
-                print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
-            }
-        }.resume()
     }
+
     
     public static func addTimesheetCharge(clName: String, clCap: NSDecimalNumber, clFunded: NSDecimalNumber, clDateStart: String, clDateEnd: String, context: NSManagedObjectContext) {
         let newCL = ChargeLine(context: context)
