@@ -564,4 +564,116 @@ import os.log
         }
     }
     
+//    func getAccessToken(completion: @escaping (String?) -> Void) {
+//        let tenantId = "c7e6c7ae-cbff-4271-91d6-23cec911e0f4"
+//        let clientId = "81fb914d-95d9-43ec-90d7-82479f4a8fb8"
+//        let clientSecret = "VRbj~TE.O.FBz7L1ocMhA.p~x7XRr9q2F3"
+//        
+//        let tokenURL = URL(string: "https://login.microsoftonline.us/\(tenantId)/oauth2/v2.0/token")!
+//        
+//        var request = URLRequest(url: tokenURL)
+//        request.httpMethod = "POST"
+//        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+//        
+//        let bodyParams = [
+//            "client_id": clientId,
+//            "scope": "https://outlook.office365.us/.default",
+//            "client_secret": clientSecret,
+//            "grant_type": "client_credentials"
+//        ]
+//        
+//        request.httpBody = bodyParams
+//            .map { "\($0.key)=\($0.value)" }
+//            .joined(separator: "&")
+//            .data(using: .utf8)
+//        
+//        URLSession.shared.dataTask(with: request) { data, _, _ in
+//            guard let data = data,
+//                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+//                  let token = json["access_token"] as? String else {
+//                completion(nil)
+//                return
+//            }
+//            completion(token)
+//        }.resume()
+//    }
+    
+    func getSMTPAccessToken(completion: @escaping (String?) -> Void) {
+        let tenantId = ""
+        let clientId = ""
+        let clientSecret = ""
+
+        let tokenURL = URL(string: "https://login.microsoftonline.us/\(tenantId)/oauth2/v2.0/token")!
+        var request = URLRequest(url: tokenURL)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        let bodyParams = [
+            "client_id": clientId,
+            "scope": "https://outlook.office365.us/.default",
+            "client_secret": clientSecret,
+            "grant_type": "client_credentials"
+        ]
+
+        request.httpBody = bodyParams
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: "&")
+            .data(using: .utf8)
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let token = json["access_token"] as? String else {
+                print("Failed to get token: \(error?.localizedDescription ?? "unknown error")")
+                completion(nil)
+                return
+            }
+            completion(token)
+        }.resume()
+    }
+
+    
+    func sendEmail(accessToken: String, recipientEmail: String, subject: String) {
+        let senderEmail = "glt@glintlock.com"   // <-- put your real sender email
+        let recipientEmail = recipientEmail // <-- put the target email
+        
+        let graphURL = URL(string: "https://graph.microsoft.us/v1.0/users/\(senderEmail)/sendMail")!
+        
+        var request = URLRequest(url: graphURL)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let emailPayload: [String: Any] = [
+            "message": [
+                "subject": "Hello from GCC High",
+                "body": [
+                    "contentType": "Text",
+                    "content": "This is a test email sent from an iOS app using Microsoft Graph."
+                ],
+                "toRecipients": [
+                    ["emailAddress": ["address": recipientEmail]]
+                ]
+            ],
+            "saveToSentItems": true
+        ]
+        
+        request.httpBody = try? JSONSerialization.data(withJSONObject: emailPayload)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Error sending email: \(error)")
+            } else if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 202 {
+                    print("Email sent successfully!")
+                } else {
+                    print("Failed with status code: \(httpResponse.statusCode)")
+                }
+            }
+        }.resume()
+    }
+
+    
 }
+
+    
