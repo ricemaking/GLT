@@ -186,6 +186,7 @@
 				1F2C0CE02D3711D00085EF49 /* GLT */,
 				1F2C0CF62D3711D10085EF49 /* GLTTests */,
 				1F2C0D002D3711D10085EF49 /* GLTUITests */,
+				FCFFCC052E04F745008482C0 /* Frameworks */,
 				1F2C0CDF2D3711D00085EF49 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -198,6 +199,13 @@
 				1F2C0CFD2D3711D10085EF49 /* GLTUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		FCFFCC052E04F745008482C0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -539,6 +547,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 8DPC3H8YYG;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GLT/Info.plist;
@@ -568,6 +577,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = 8DPC3H8YYG;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = GLT/Info.plist;
