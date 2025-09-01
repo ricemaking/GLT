@@ -4,6 +4,14 @@ import Foundation
 import MSAL
 import os.log
 
+//backend python func to fetch latest ___ in cloud db (azure)
+//compares to latest in local db
+
+//other func
+//if local db != coud db
+//update local db (GET)
+
+
 // Define an enum for your views
 enum AppView: Hashable {
     case employee
@@ -273,6 +281,7 @@ struct ContentView: View
                                                         loginID = AuthenticationManager.shared.extractValue(from: jwtPayloadString, using: "\"unique_name\"\\s*:\\s*\"([^\"]*)\"") ?? "Unknown"
                                                         activeLogin = true
                                                         revokeRequest = false
+                                                        
                                                         AuthenticationManager.shared.checkOneDriveAccess(accessToken: token) { accessSuccess, accessError in
                                                             DispatchQueue.main.async {
                                                                 if accessSuccess {
@@ -358,6 +367,7 @@ struct ContentView: View
             for employee in employees {
                 print(employee.email ?? "No email")
             }
+             
             
             AuthenticationManager.shared.acquireTokenSilently { token, silentError in
                 if let token = token {
@@ -373,8 +383,8 @@ struct ContentView: View
                     activeLogin = false
                 }
             }
+             
         }
     }
 }
-
 

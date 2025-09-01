@@ -8,14 +8,172 @@
 import Foundation
 import CoreData
 import SwiftUI
+import Security
+
+
+//url session functions:
+
+class ClientCertificateAuth: NSObject, URLSessionDelegate {
+    private let identity: SecIdentity
+    private let certs: [SecCertificate]
+
+    init?(p12Name: String, p12Password: String) {
+        guard let path = Bundle.main.path(forResource: p12Name, ofType: "p12"),
+              let p12Data = try? Data(contentsOf: URL(fileURLWithPath: path)) else {
+            print("❌ Could not find p12 file in bundle")
+            return nil
+        }
+        
+        var importResult: CFArray?
+        let options: NSDictionary = [kSecImportExportPassphrase as NSString: p12Password]
+        
+        let status = SecPKCS12Import(p12Data as NSData, options, &importResult)
+        guard status == errSecSuccess,
+              let items = importResult as? [[String: Any]],
+              let certArray = items[0][kSecImportItemCertChain as String] as? [SecCertificate] else {
+            print("❌ Failed to import p12: \(status)")
+            return nil
+        }
+        
+        // 🔑 No optional binding here — just force cast because SecIdentity is guaranteed if key exists
+        let identity = items[0][kSecImportItemIdentity as String] as! SecIdentity
+        
+        self.identity = identity
+        self.certs = certArray
+    }
+    
+    func urlSession(_ session: URLSession,
+                    didReceive challenge: URLAuthenticationChallenge,
+                    completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodClientCertificate {
+            let credential = URLCredential(identity: identity, certificates: certs, persistence: .forSession)
+            completionHandler(.useCredential, credential)
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
+    }
+}
+
+// Function that sends a POST request with JSON payload and client certificate authentication.
+
+func postJSON<T: Codable>(payload: T, endpoint: String) {
+    guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+        print("❌ Failed to load client certificate")
+        return
+    }
+
+    guard let url = URL(string: endpoint) else {
+        print("❌ Invalid URL")
+        return
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    do {
+        let jsonData = try JSONEncoder().encode(payload)
+        request.httpBody = jsonData
+        print("📤 Sending payload:", String(data: jsonData, encoding: .utf8)!)
+    } catch {
+        print("❌ Failed to encode payload:", error)
+        return
+    }
+
+    let session = URLSession(configuration: .default, delegate: auth, delegateQueue: nil)
+    let semaphore = DispatchSemaphore(value: 0)
+
+    session.dataTask(with: request) { data, response, error in
+        defer { semaphore.signal() }
+
+        if let error = error {
+            print("❌ Backend POST failed:", error)
+            return
+        }
+
+        if let httpResponse = response as? HTTPURLResponse {
+            print("🌐 Backend status code:", httpResponse.statusCode)
+        }
+
+        if let data = data, let bodyString = String(data: data, encoding: .utf8) {
+            print("📦 Backend response:", bodyString)
+        }
+    }.resume()
+
+    semaphore.wait()
+}
+
+
+
+/*******************************/
+struct EmployeePayload: Codable {
+    let id: Int
+    let nameFirst: String
+    let nameLast: String
+    let phone: String
+    let email: String
+    let dob: String
+
+    let city: String
+    let state: String
+    let streetAddress: String
+    let zipcode: String
+
+    let startDate: String
+    let endDate: String?
+
+    let clearanceLevel: String
+    let authenticated: Bool
+    let chargeline_ids: [Int]
+    let timesheet_ids: [Int]
+}
+
+struct ChargeLinePayload: Codable {
+    let id: Int32
+    let name: String
+    let cap: Decimal
+    let funded: Decimal
+    let dateStart: String
+    let dateEnd: String
+    let employee_ids: [Int]?
+}
+
+struct TimesheetPayload: Codable{
+    let id: Int
+    let employeeID: Int
+    let month: Int
+    let year: Int
+    let dateCreated: Date?
+    let dateSubmitted: Date?
+    let submitted: Bool
+    let enabled: Bool
+    let version: Int
+}
+
 
 public struct GLTFunctions {
     
-    // Function to add a new employee
-    public static func addEmployee(nameFirst: String, nameLast: String, dob: String, endDate: Date? = nil, email: String, phone: String, streetAddress: String, city: String, state: String, startDate: Date? = Date(), zipCode: String, clearanceLevel: String, context: NSManagedObjectContext){
+    public static func addEmployee(
+        nameFirst: String,
+        nameLast: String,
+        dob: Date,
+        endDate: Date? = nil,
+        email: String,
+        phone: String,
+        streetAddress: String,
+        city: String,
+        state: String,
+        startDate: Date = Date(),
+        zipCode: String,
+        clearanceLevel: String,
+        context: NSManagedObjectContext
+    ) {
         let newEmployee = Employee(context: context)
         let highestID = fetchHighestEmployeeID(context: context)
-        newEmployee.id = highestID + 1
+        let newID = highestID + 1
+
+        newEmployee.id = newID
         newEmployee.nameFirst = nameFirst
         newEmployee.nameLast = nameLast
         newEmployee.email = email
@@ -25,65 +183,167 @@ public struct GLTFunctions {
         newEmployee.state = state
         newEmployee.zipCode = zipCode
         newEmployee.clearanceLevel = clearanceLevel
-        newEmployee.dob = dob
         newEmployee.startDate = startDate
-        if endDate != nil {
-            newEmployee.endDate = endDate
-        }
-        
+        newEmployee.endDate = endDate
+        newEmployee.authenticated = true
+
         do {
             try context.save()
-            print("Employee added successfully")
+            print("✅ Employee saved locally")
         } catch {
-            print("Failed to save the new employee: \(error)")
+            print("❌ Failed to save employee: \(error)")
+            return
         }
+
+        // Prepare payload
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+        let employeePayload = EmployeePayload(
+            id: Int(newID),
+            nameFirst: nameFirst,
+            nameLast: nameLast,
+            phone: phone,
+            email: email,
+            dob: formatter.string(from: dob),
+            city: city,
+            state: state,
+            streetAddress: streetAddress,
+            zipcode: zipCode,
+            startDate: formatter.string(from: startDate),
+            endDate: endDate != nil ? formatter.string(from: endDate!) : nil,
+            clearanceLevel: clearanceLevel,
+            authenticated: true,
+            chargeline_ids: [],
+            timesheet_ids: []
+        )
+
+        postJSON(payload: employeePayload, endpoint: "https://glt.glintlock.com/employees")
     }
+
     
-    // Function to add a new employee
+    // Function to add a new charge line
     public static func addChargeLine(clName: String, clCap: NSDecimalNumber, clFunded: NSDecimalNumber, clDateStart: String, clDateEnd: String, context: NSManagedObjectContext) {
         let newCL = ChargeLine(context: context)
-        let highestID = fetchHighestCLID(context: context)
-        newCL.clID = highestID + 1
-        newCL.clName = clName
-        newCL.clCap = clCap
-        newCL.clFunded = clFunded
-        newCL.clDateStart = clDateStart
-        newCL.clDateEnd = clDateEnd
-        
-        do {
-            try context.save()
-            print("Employee added successfully")
-        } catch {
-            print("Failed to save the new employee: \(error)")
-        }
+            
+            let highestID = fetchHighestCLID(context: context)
+            newCL.clID = highestID + 1
+            newCL.clName = clName
+            newCL.clCap = clCap
+            newCL.clFunded = clFunded
+            newCL.clDateStart = clDateStart
+            newCL.clDateEnd = clDateEnd
+            
+            do {
+                try context.save()
+                print("✅ ChargeLine saved locally")
+            } catch {
+                print("❌ Failed to save locally: \(error)")
+            }
+            
+            
+            let chargeLinePayload = ChargeLinePayload(
+                id: highestID + 1,
+                name: clName,
+                cap: clCap as Decimal,
+                funded: clFunded as Decimal,
+                dateStart: clDateStart,
+                dateEnd: clDateEnd,
+                employee_ids: nil
+            )
+
+            
+            postJSON(payload: chargeLinePayload, endpoint: "https://glt.glintlock.com/chargelines")
     }
     
-    public static func addTimesheet(byID targetid: Int32, month: Int16? = nil, year: Int16? = nil, context: NSManagedObjectContext) -> Timesheet? {
+    public static func addTimesheet(byID targetID: Int32, month: Int16? = nil, year: Int16? = nil, context: NSManagedObjectContext) -> Timesheet? {
         let newTS = Timesheet(context: context)
-        let predicate = NSPredicate(format: "id == %d", targetid)
         let EMPfetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
-        let highestID = fetchHighestTSID(context: context)
-        newTS.version = 0
-        newTS.id = highestID + 1
-        newTS.enabled = true
-        newTS.dateSubmitted = nil
-        newTS.dateCreated = Date()
-        newTS.submitted = false
-        newTS.year = year ?? Int16(fetchCurYear())
-        newTS.month = month ?? Int16(fetchCurMonth())
-        EMPfetchRequest.predicate = predicate
+        EMPfetchRequest.predicate = NSPredicate(format: "id == %d", targetID)
+        
         do {
             let employees = try context.fetch(EMPfetchRequest)
-            let employee = employees[0]
-            employee.addToTimesheet(newTS)
+            guard let employee = employees.first else {
+                print("❌ Employee not found")
+                return nil
+            }
+            
+            // Assign Timesheet values
+            let highestID = fetchHighestTSID(context: context)
+            newTS.id = highestID + 1
+            newTS.version = 0
+            newTS.enabled = true
+            newTS.submitted = false
+            newTS.dateCreated = Date()
+            newTS.dateSubmitted = nil
+            newTS.month = month ?? Int16(fetchCurMonth())
+            newTS.year = year ?? Int16(fetchCurYear())
             newTS.employeeID = employee.id
+            employee.addToTimesheet(newTS)
+            
             try context.save()
+            
+            // Prepare payload for backend
+            let timesheetPayload = TimesheetPayload(
+                id: Int(newTS.id),
+                employeeID: Int(newTS.employeeID),
+                month: Int(newTS.month),
+                year: Int(newTS.year),
+                dateCreated: newTS.dateCreated,
+                dateSubmitted: newTS.dateSubmitted,
+                submitted: newTS.submitted,
+                enabled: newTS.enabled,
+                version: Int(newTS.version)
+            )
+            
+            // Client certificate auth
+            guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+                print("❌ Failed to load client certificate")
+                return newTS
+            }
+            
+            let config = URLSessionConfiguration.default
+            let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
+            
+            guard let url = URL(string: "https://glt.glintlock.com/timesheets/") else {
+                print("Invalid URL")
+                return newTS
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            let encoder = JSONEncoder()
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+            encoder.dateEncodingStrategy = .formatted(dateFormatter)
+            
+            request.httpBody = try encoder.encode(timesheetPayload)
+            
+            session.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("Backend POST failed: \(error)")
+                    return
+                }
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("🌐 Backend status code: \(httpResponse.statusCode)")
+                }
+                if let data = data {
+                    print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
+                }
+            }.resume()
+            
             return newTS
+            
         } catch {
+            print("❌ Failed to add timesheet: \(error)")
             return nil
         }
-        //return newTS2
     }
+
     
     public static func addTimesheetCharge(clName: String, clCap: NSDecimalNumber, clFunded: NSDecimalNumber, clDateStart: String, clDateEnd: String, context: NSManagedObjectContext) {
         let newCL = ChargeLine(context: context)
@@ -101,7 +361,10 @@ public struct GLTFunctions {
         } catch {
             print("Failed to save the new employee: \(error)")
         }
+        
     }
+    
+    
     
     
     //Convert Date to a string.  Date must be in dd/MM/yyyy HH:mm:ss format

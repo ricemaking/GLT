@@ -32,8 +32,11 @@ struct AddEmployeeView: View {
     @State private var startDateString: String = ""
     @State private var endDateString: String = ""
     
-    @State private var isValid: Bool = true
     @State private var showSuccessMessage: Bool = false
+    
+    private var isValid: Bool {
+        isNameValid && isDOBValid && isStartDateValid && isEndDateValid && isPhoneValid && isZipCodeValid
+    }
     
     // Picker Options for Clearance Level
     var clearanceLevels = ["SCI", "TS", "Secret", "Interim Secret", "Not Cleared"]
@@ -370,45 +373,38 @@ struct AddEmployeeView: View {
     
     // MARK: - Add Employee Function
     private func addEmployee() {
-        // Trim the date fields before validation.
         let trimmedDOB = dob.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedStartDate = startDateString.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Validate required fields: name, DOB, and start date.
+
+        let parsedDOB = mmddyyyyFormatter.date(from: trimmedDOB)
+        let parsedStartDate = mmddyyyyFormatter.date(from: trimmedStartDate)
+        let parsedEndDate = endDateString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil
+            : mmddyyyyFormatter.date(from: endDateString)
+
         guard isNameValid,
-              !trimmedDOB.isEmpty,
-              let _ = mmddyyyyFormatter.date(from: trimmedDOB),
-              !trimmedStartDate.isEmpty,
-              let parsedStartDate = mmddyyyyFormatter.date(from: trimmedStartDate)
+              let dobUnwrapped = parsedDOB,
+              let startDateUnwrapped = parsedStartDate
         else {
-            isValid = false
             return
         }
-        isValid = true
-        let parsedEndDate: Date? = endDateString.isEmpty ? nil : mmddyyyyFormatter.date(from: endDateString)
-        
-        // Here you can call your data layer to add the employee.
-        // For example, using GLTFunctions.addEmployee if desired or directly inserting into Core Data.
-        // In this version, we'll assume GLTFunctions.addEmployee is available.
-        
-        // For the date of birth, if you have a transformation function, you can call it:
-        let transformedDOB = GLTFunctions.transformDateString(dob) ?? "00/00/0000"
-        
+
         GLTFunctions.addEmployee(
             nameFirst: nameFirst,
             nameLast: nameLast,
-            dob: transformedDOB,
+            dob: dobUnwrapped,
             endDate: parsedEndDate,
             email: email,
             phone: phone,
             streetAddress: streetAddress,
             city: city,
             state: stateText,
-            startDate: parsedStartDate,
+            startDate: startDateUnwrapped,
             zipCode: zipCode,
             clearanceLevel: clearanceLevel,
             context: viewContext
         )
+
         
         // Update navigation and display a success message.
         path = NavigationPath()

@@ -76,7 +76,7 @@ struct ManagementView: View {
                         path.append(AppView.management)
                         path.append(AppView.cl2emp1)
                     } else {
-                        showAlert = "Brah, you fo real?  \nYou no have access to Dakine hea - K! 🤙🏽"
+                        showAlert = "Brah, you fo real?  \nYou no have access to Dakine hea - K! ei  🤙🏽"
                     }
                 }
                 .buttonStyle(BorderedProminentButtonStyle())

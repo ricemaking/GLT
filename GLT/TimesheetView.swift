@@ -287,12 +287,6 @@ struct TimesheetView: View {
             welcomeMessage = "Error: Timesheet data unavailable"
         }
     }
-    
-//    private func handleShowPrev() {
-//        if !chargeLineHistory.isEmpty {
-//            showPrev.toggle()
-//        }
-//    }
 
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -306,7 +300,7 @@ struct TimesheetView: View {
     private func saveAllChargeLines() {
         if hasInternetConnection() && offlineLogin == false {
             managedObjectContext.perform {
-                let currentEmpID = targetid
+                let currentEmpID = employee?.id ?? 0
                 let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO", currentEmpID, month, year)
                 do {
@@ -319,6 +313,8 @@ struct TimesheetView: View {
                             tsCharge.saved = true
                             tsCharge.dateSaved = Date()
                             tsCharge.offline = false
+                            tsCharge.verified = true
+                            tsCharge.denied = false
                             print("marked tsCharge as saved online, version: \(tsCharge.version)")
                             //version?
                             let newTSCharge = TSCharge(context: managedObjectContext)
@@ -353,7 +349,7 @@ struct TimesheetView: View {
             offlineLogin=true
             print("offline login true, no internet connection")
              managedObjectContext.perform {
-                 let currentEmpID = targetid
+                 let currentEmpID = employee?.id ?? 0
                  let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
                  fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d AND saved==NO AND denied == NO", currentEmpID, month, year)
                  print("fetched charges")
@@ -488,7 +484,7 @@ struct TimesheetView: View {
 
     private func submitTimesheet() {
         managedObjectContext.perform {
-            let currentEmpID = targetid
+            let currentEmpID = employee?.id ?? 0
             let fetchRequest: NSFetchRequest<TSCharge> = TSCharge.fetchRequest()
             fetchRequest.predicate = NSPredicate(format: "employeeID == %d AND month == %d AND year == %d", currentEmpID, month, year)
             
@@ -574,6 +570,8 @@ struct TimesheetView: View {
                 charge.offline = false
                 charge.verified = true
                 print("approved day \(charge.day): \(charge.hours ?? 0) hours, \(charge.tempHours ?? 0) tempHours, offline: \(charge.offline), verified: \(charge.verified), denied: \(charge.denied), saved: \(charge.saved)")
+                
+                //also push to cloud db
             }
             do {
                 try managedObjectContext.save()
