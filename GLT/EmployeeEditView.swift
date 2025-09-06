@@ -20,7 +20,6 @@ struct EmployeeEditView: View {
     @State private var startDateString: String = ""
     @State private var endDateString: String = ""
     
-    @State private var isValid: Bool = true
     @State private var showSuccessMessage: Bool = false
     @State private var employee: Employee?
     
@@ -50,6 +49,10 @@ struct EmployeeEditView: View {
     
     // MARK: - Computed Validation Properties
     
+    private var isValid: Bool {
+        isNameValid && isDOBValid && isStartDateValid && isEndDateValid && isPhoneValid && isZipCodeValid
+    }
+    
     private var isNameValid: Bool {
         !nameFirst.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !nameLast.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -69,6 +72,25 @@ struct EmployeeEditView: View {
         let trimmed = endDateString.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return true }
         return trimmed.count == 10 && mmddyyyyFormatter.date(from: trimmed) != nil
+    }
+    
+    private var isZipCodeValid: Bool {
+        let trimmed = zipCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains("-") {
+            let parts = trimmed.split(separator: "-")
+            return parts.count == 2 &&
+                   parts[0].count == 5 &&
+                   parts[1].count == 4 &&
+                   parts.allSatisfy { $0.allSatisfy { $0.isNumber } }
+        } else {
+            let digits = trimmed.filter { $0.isNumber }
+            return digits.count == 5 || digits.count == 9
+        }
+    }
+    
+    private var isPhoneValid: Bool {
+        let digits = phone.filter { $0.isNumber }
+        return digits.count == 10
     }
     
     var body: some View {
@@ -113,6 +135,9 @@ struct EmployeeEditView: View {
                     
                     VStack(alignment: .leading) {
                         Text("Phone")
+                        if !isPhoneValid {
+                            Text("❌").foregroundColor(.red)
+                        }
                         TextField("Enter Phone", text: $phone)
                             .focused($phoneFieldIsFocused)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -145,6 +170,10 @@ struct EmployeeEditView: View {
                     
                     VStack(alignment: .leading) {
                         Text("Zip Code")
+                        if !isZipCodeValid {
+                            Text("❌")
+                                .foregroundColor(.red)
+                        }
                         // Replace with your custom ZipCodeTextField if needed.
                         TextField("Enter Zip Code", text: $zipCode)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -348,19 +377,20 @@ struct EmployeeEditView: View {
     private func handleEditEmployee() {
         let trimmedDOB = dob.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedStartDate = startDateString.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let parsedStartDate = mmddyyyyFormatter.date(from: trimmedStartDate)
+        let parsedEndDate = endDateString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil
+            : mmddyyyyFormatter.date(from: endDateString)
+
         guard isNameValid,
-              !trimmedDOB.isEmpty,
-              let parsedDOB = mmddyyyyFormatter.date(from: trimmedDOB),
-              !trimmedStartDate.isEmpty,
-              let parsedStartDate = mmddyyyyFormatter.date(from: trimmedStartDate)
+              let startDateUnwrapped = parsedStartDate
         else {
-            isValid = false
             return
         }
-        isValid = true
-        let parsedEndDate: Date? = endDateString.isEmpty ? nil : mmddyyyyFormatter.date(from: endDateString)
-        
+
         if let emp = employee {
+            // Update Core Data object locally
             emp.nameFirst = nameFirst
             emp.nameLast = nameLast
             emp.dob = trimmedDOB
@@ -373,12 +403,12 @@ struct EmployeeEditView: View {
             emp.clearanceLevel = clearanceLevel
             emp.startDate = parsedStartDate
             emp.endDate = parsedEndDate
-            
-            // Save updated manager role flags.
+
+            // Update manager role flags
             emp.manager_HR = manager_HR
             emp.manager_TimeCard = manager_TimeCard
             emp.manager_ChargeLine = manager_ChargeLine
-            
+
             do {
                 try viewContext.save()
                 showSuccessMessage = true
@@ -386,6 +416,12 @@ struct EmployeeEditView: View {
             } catch {
                 print("Failed to save employee changes: \(error)")
             }
+
+            // Send update to backend using GLTFunctions
+            GLTFunctions.updateEmployee(
+                employee: emp,
+                context: viewContext
+            )
         }
     }
 }

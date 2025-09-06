@@ -2,7 +2,7 @@
 //  ChargeLine+CoreDataProperties.swift
 //  GLT
 //
-//  Created by Player_1 on 3/8/25.
+//  Created by dylan domingo on 9/3/25.
 //
 //
 
@@ -22,8 +22,11 @@ extension ChargeLine {
     @NSManaged public var clFunded: NSDecimalNumber?
     @NSManaged public var clID: Int32
     @NSManaged public var clName: String?
+    @NSManaged public var employeeIDs: [Int32]?
     @NSManaged public var employee: NSSet?
-    @NSManaged public var charge: NSSet?
+    @NSManaged public var task: Task?
+    @NSManaged public var timesheet: NSSet?
+    @NSManaged public var tsCharge: NSSet?
 
 }
 
@@ -44,23 +47,40 @@ extension ChargeLine {
 
 }
 
-// MARK: Generated accessors for charge
+// MARK: Generated accessors for timesheet
 extension ChargeLine {
 
-    @objc(addChargeObject:)
-    @NSManaged public func addToCharge(_ value: TSCharge)
+    @objc(addTimesheetObject:)
+    @NSManaged public func addToTimesheet(_ value: Timesheet)
 
-    @objc(removeChargeObject:)
-    @NSManaged public func removeFromCharge(_ value: TSCharge)
+    @objc(removeTimesheetObject:)
+    @NSManaged public func removeFromTimesheet(_ value: Timesheet)
 
-    @objc(addCharge:)
-    @NSManaged public func addToCharge(_ values: NSSet)
+    @objc(addTimesheet:)
+    @NSManaged public func addToTimesheet(_ values: NSSet)
 
-    @objc(removeCharge:)
-    @NSManaged public func removeFromCharge(_ values: NSSet)
+    @objc(removeTimesheet:)
+    @NSManaged public func removeFromTimesheet(_ values: NSSet)
+
+}
+
+// MARK: Generated accessors for tsCharge
+extension ChargeLine {
+
+    @objc(addTsChargeObject:)
+    @NSManaged public func addToTsCharge(_ value: TSCharge)
+
+    @objc(removeTsChargeObject:)
+    @NSManaged public func removeFromTsCharge(_ value: TSCharge)
+
+    @objc(addTsCharge:)
+    @NSManaged public func addToTsCharge(_ values: NSSet)
+
+    @objc(removeTsCharge:)
+    @NSManaged public func removeFromTsCharge(_ values: NSSet)
 
 }
 
 extension ChargeLine : Identifiable {
-
+    public var id: Int32 { clID }
 }

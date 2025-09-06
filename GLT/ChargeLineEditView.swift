@@ -13,127 +13,81 @@ struct ChargeLineEditView: View {
     @State private var clDateEnd: String = ""
     @State private var isValid: Bool = true
     @State private var showSuccessMessage = false
-    @State private var cl: ChargeLine? // The currently selected ChargeLine
+    @State private var cl: ChargeLine?
 
     var body: some View {
         VStack {
-            VStack {
-                Text("Name")
-                TextField("Name", text: $clName)
-                    .padding()
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-            }
+            TextField("Name", text: $clName).textFieldStyle(RoundedBorderTextFieldStyle()).padding()
+            
             HStack {
-                VStack {
-                    Text("Funds (Actual)")
-                    TextField("$ (Actual)", text: $clFunded)
-                        .padding()
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
-                VStack {
-                    Text("Funds (Cap)")
-                    TextField("$ (Cap)", text: $clCap)
-                        .padding()
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
+                TextField("Funds (Actual)", text: $clFunded)
+                    .textFieldStyle(RoundedBorderTextFieldStyle()).padding()
+                TextField("Funds (Cap)", text: $clCap)
+                    .textFieldStyle(RoundedBorderTextFieldStyle()).padding()
             }
+            
             HStack {
-                VStack {
-                    Text("Start Date")
-                    TextField("Enter Date Start (yyyy-MM-dd)", text: $clDateStart)
-                        .padding()
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
-                VStack {
-                    Text("End Date")
-                    TextField("Enter Date End (yyyy-MM-dd)", text: $clDateEnd)
-                        .padding()
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                }
+                TextField("Start Date (yyyy-MM-dd)", text: $clDateStart)
+                    .textFieldStyle(RoundedBorderTextFieldStyle()).padding()
+                TextField("End Date (yyyy-MM-dd)", text: $clDateEnd)
+                    .textFieldStyle(RoundedBorderTextFieldStyle()).padding()
             }
+            
             Button("Save Changes") {
                 saveChargeLine()
             }
             .disabled(!isValid)
+            
             if showSuccessMessage {
                 Text("Charge Line updated successfully!")
                     .foregroundColor(.green)
                     .padding()
             }
         }
-        .onAppear {
-            fetchChargeLineData()
-        }
+        .onAppear { fetchChargeLine() }
     }
     
-    // MARK: - Fetch Existing ChargeLine Data
-    private func fetchChargeLineData() {
+    private func fetchChargeLine() {
         let request: NSFetchRequest<ChargeLine> = ChargeLine.fetchRequest()
         request.predicate = NSPredicate(format: "clID == %d", targetid)
         do {
-            let results = try viewContext.fetch(request)
-            if let chargeLine = results.first {
-                cl = chargeLine
-                clName = chargeLine.clName ?? ""
-                // Convert NSDecimalNumber to String for display
-                clCap = chargeLine.clCap?.stringValue ?? ""
-                clFunded = chargeLine.clFunded?.stringValue ?? ""
-                clDateStart = chargeLine.clDateStart ?? ""
-                clDateEnd = chargeLine.clDateEnd ?? ""
+            if let result = try viewContext.fetch(request).first {
+                cl = result
+                clName = result.clName ?? ""
+                clCap = result.clCap?.stringValue ?? ""
+                clFunded = result.clFunded?.stringValue ?? ""
+                clDateStart = result.clDateStart ?? ""
+                clDateEnd = result.clDateEnd ?? ""
             }
         } catch {
-            print("Failed to fetch ChargeLine: \(error)")
+            print("Failed to fetch ChargeLine:", error)
         }
     }
     
-    // MARK: - Save ChargeLine Changes
     private func saveChargeLine() {
-        guard let chargeLine = cl else {
-            print("No ChargeLine loaded for editing")
-            return
-        }
+        guard let chargeLine = cl else { return }
         
-        // Validate inputs using your GLTFunctions (or other validation logic)
-        if GLTFunctions.validDateInput(clDateStart),
+        if GLTFunctions.validateDecimalInput(clCap),
+           GLTFunctions.validateDecimalInput(clFunded),
+           GLTFunctions.validDateInput(clDateStart),
            GLTFunctions.validDateInput(clDateEnd),
-           !clName.isEmpty,
-           GLTFunctions.validateDecimalInput(clCap),
-           GLTFunctions.validateDecimalInput(clFunded) {
+           !clName.isEmpty {
             
-            // Optionally transform the date strings (or use them directly)
-            let newStart = GLTFunctions.transformDateString(clDateStart) ?? clDateStart
-            let newEnd = GLTFunctions.transformDateString(clDateEnd) ?? clDateEnd
-            
-            // Convert funding strings to NSDecimalNumber
-            let capNum = NSDecimalNumber(string: clCap)
-            let fundedNum = NSDecimalNumber(string: clFunded)
-            
-            if capNum == NSDecimalNumber.notANumber || fundedNum == NSDecimalNumber.notANumber {
-                isValid = false
-                print("Invalid decimal input for funding values")
-                return
-            }
-            
-            // Update the entity values
             chargeLine.clName = clName
-            chargeLine.clCap = capNum
-            chargeLine.clFunded = fundedNum
-            chargeLine.clDateStart = newStart
-            chargeLine.clDateEnd = newEnd
+            chargeLine.clCap = NSDecimalNumber(string: clCap)
+            chargeLine.clFunded = NSDecimalNumber(string: clFunded)
+            chargeLine.clDateStart = GLTFunctions.transformDateString(clDateStart) ?? clDateStart
+            chargeLine.clDateEnd = GLTFunctions.transformDateString(clDateEnd) ?? clDateEnd
             
-            do {
-                try viewContext.save()
-                showSuccessMessage = true
-                // Reset the navigation path as desired:
-                path = NavigationPath()
-                path.append(AppView.management)
-                path.append(AppView.chargeLine)
-            } catch {
-                print("Failed to save ChargeLine: \(error)")
-            }
+            GLTFunctions.updateChargeLine(chargeLine: chargeLine, context: viewContext)
+            
+            showSuccessMessage = true
+            path = NavigationPath()
+            path.append(AppView.management)
+            path.append(AppView.chargeLine)
         } else {
             isValid = false
-            print("Missing field(s) or invalid input format.")
+            print("Invalid input")
         }
     }
 }

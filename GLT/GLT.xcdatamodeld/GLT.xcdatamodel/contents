@@ -10,6 +10,7 @@
         <attribute name="clFunded" optional="YES" attributeType="Decimal" defaultValueString="0.0"/>
         <attribute name="clID" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="clName" optional="YES" attributeType="String"/>
+        <attribute name="employeeIDs" optional="YES" attributeType="Transformable"/>
         <relationship name="employee" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Employee" inverseName="chargeLine" inverseEntity="Employee"/>
         <relationship name="task" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Task" inverseName="chargeLine" inverseEntity="Task"/>
         <relationship name="timesheet" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Timesheet" inverseName="chargeLine" inverseEntity="Timesheet"/>
@@ -28,6 +29,7 @@
     </entity>
     <entity name="Employee" representedClassName="Employee" syncable="YES">
         <attribute name="authenticated" transient="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="chargeLineIDs" optional="YES" attributeType="Transformable"/>
         <attribute name="city" optional="YES" attributeType="String"/>
         <attribute name="clearanceLevel" optional="YES" attributeType="String"/>
         <attribute name="dob" optional="YES" attributeType="String"/>
@@ -43,6 +45,7 @@
         <attribute name="startDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="state" optional="YES" attributeType="String"/>
         <attribute name="streetAddress" optional="YES" attributeType="String"/>
+        <attribute name="timesheetIDs" optional="YES" attributeType="Transformable"/>
         <attribute name="zipCode" optional="YES" attributeType="String"/>
         <relationship name="chargeLine" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ChargeLine" inverseName="employee" inverseEntity="ChargeLine"/>
         <relationship name="timesheet" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Timesheet" inverseName="toEmployee" inverseEntity="Timesheet"/>

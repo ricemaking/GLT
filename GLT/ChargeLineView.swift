@@ -6,29 +6,42 @@ struct ChargeLineView: View {
     @Binding var path: NavigationPath
     @Binding var targetid: Int32
 
-    @FetchRequest(sortDescriptors: []) var cls: FetchedResults<ChargeLine>
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \ChargeLine.clID, ascending: true)]
+    ) var cls: FetchedResults<ChargeLine>
     
+    @State private var isLoading: Bool = false
+
     var body: some View {
         List {
             ForEach(cls) { cl in
-                if let name = cl.clName, let funded = cl.clFunded, let clCap = cl.clCap {
-                    let tempID: String = String(format: "%05d", cl.clID)
-                    HStack {
-                        Text("ID: \(tempID)\nCharge Line Name: \(name)\nFunding Amount: \(funded)\nFunding Cap: \(clCap)")
-                            .padding()
-                        Spacer()
-                        Button("Edit") {
-                            targetid = cl.clID // Set the target ID for editing
-                            path.append(AppView.chargeLineEditView) // Navigate to ChargeLineEditView
-                        }
+                let tempID = String(format: "%05d", cl.clID)
+                HStack {
+                    Text("""
+                        ID: \(tempID)
+                        Name: \(cl.clName ?? "")
+                        Funded: \(cl.clFunded?.stringValue ?? "")
+                        Cap: \(cl.clCap?.stringValue ?? "")
+                        """)
+                        .padding()
+                    Spacer()
+                    Button("Edit") {
+                        targetid = cl.clID
+                        path.append(AppView.chargeLineEditView)
                     }
                 }
             }
         }
-        .navigationTitle("ChargeLine View")
+        .navigationTitle("Charge Lines")
         .toolbar {
             Button("+") {
-                path.append(AppView.addChargeLine) // Navigate to AddChargeLineView
+                path.append(AppView.addChargeLine)
+            }
+        }
+        .onAppear {
+            if !isLoading {
+                isLoading = true
+                GLTFunctions.getChargeLines(context: viewContext)
             }
         }
     }

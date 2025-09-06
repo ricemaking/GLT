@@ -55,9 +55,9 @@ class ClientCertificateAuth: NSObject, URLSessionDelegate {
     }
 }
 
-// Function that sends a POST request with JSON payload and client certificate authentication.
-
-func postJSON<T: Codable>(payload: T, endpoint: String) {
+/// SQL helper functions
+// Function that sends a POST request to database given a JSON payload and endpoint
+private func postJSON<T: Codable>(payload: T, endpoint: String) {
     guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
         print("❌ Failed to load client certificate")
         return
@@ -104,48 +104,164 @@ func postJSON<T: Codable>(payload: T, endpoint: String) {
     semaphore.wait()
 }
 
+// Helper function that sends GET request to database given an endpoint
+private func getJSON<T: Codable>(endpoint: String) -> T? {
+    guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+        print("❌ Failed to load client certificate")
+        return nil
+    }
+    
+    guard let url = URL(string: endpoint) else {
+        print("❌ Invalid URL")
+        return nil
+    }
+    
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    let session = URLSession(configuration: .default, delegate: auth, delegateQueue: nil)
+    let semaphore = DispatchSemaphore(value: 0)
+
+    var result: T?
+    
+    session.dataTask(with: request) { data, response, error in
+        defer { semaphore.signal() }
+
+        if let error = error {
+            print("❌ Backend GET failed:", error)
+            return
+        }
+
+        if let httpResponse = response as? HTTPURLResponse {
+            print("🌐 Backend status code:", httpResponse.statusCode)
+        }
+
+        guard let data = data else {
+            print("❌ No data received")
+            return
+        }
+
+        do {
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .useDefaultKeys
+            result = try decoder.decode(T.self, from: data)
+            if let bodyString = String(data: data, encoding: .utf8) {
+                print("📦 Backend response:", bodyString)
+            }
+        } catch {
+            print("❌ Failed to decode JSON:", error)
+        }
+
+    }.resume()
+
+    semaphore.wait()
+    return result
+}
+
+// Helper function that sends POST request to database given a payload and endpoint
+private func putJSON<T: Codable>(payload: T, endpoint: String) {
+    guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
+        print("❌ Failed to load client certificate")
+        return
+    }
+
+    guard let url = URL(string: endpoint) else {
+        print("❌ Invalid URL")
+        return
+    }
+
+    var request = URLRequest(url: url)
+    request.httpMethod = "PUT"
+    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+
+    do {
+        let jsonData = try JSONEncoder().encode(payload)
+        request.httpBody = jsonData
+        print("📤 Sending payload:", String(data: jsonData, encoding: .utf8)!)
+    } catch {
+        print("❌ Failed to encode payload:", error)
+        return
+    }
+
+    let session = URLSession(configuration: .default, delegate: auth, delegateQueue: nil)
+    let semaphore = DispatchSemaphore(value: 0)
+
+    session.dataTask(with: request) { data, response, error in
+        defer { semaphore.signal() }
+
+        if let error = error {
+            print("❌ Backend PUT failed:", error)
+            return
+        }
+
+        if let httpResponse = response as? HTTPURLResponse {
+            print("🌐 Backend status code:", httpResponse.statusCode)
+        }
+
+        if let data = data, let bodyString = String(data: data, encoding: .utf8) {
+            print("📦 Backend response:", bodyString)
+        }
+    }.resume()
+
+    semaphore.wait()
+}
+
 
 
 /*******************************/
 struct EmployeePayload: Codable {
     let id: Int
-    let nameFirst: String
-    let nameLast: String
+    let nameFirst: String?
+    let nameLast: String?
     let phone: String
-    let email: String
+    let email: String?
     let dob: String
 
-    let city: String
-    let state: String
-    let streetAddress: String
-    let zipcode: String
+    let city: String?
+    let state: String?
+    let streetAddress: String?
+    let zipCode: String
 
     let startDate: String
     let endDate: String?
 
+    let managerHR: Bool
+    let managerTimeCard: Bool
+    let managerChargeLine: Bool
+
     let clearanceLevel: String
     let authenticated: Bool
-    let chargeline_ids: [Int]
-    let timesheet_ids: [Int]
+    let chargeLineIds: [Int32]
+    let timesheetIds: [Int32]
+
+    enum CodingKeys: String, CodingKey {
+        case id, nameFirst, nameLast, phone, email, dob, city, state, streetAddress, zipCode
+        case startDate, endDate, clearanceLevel, authenticated, chargeLineIds, timesheetIds
+        case managerHR = "manager_hr"
+        case managerTimeCard = "manager_timeCard"
+        case managerChargeLine = "manager_chargeLine"
+    }
 }
 
-struct ChargeLinePayload: Codable {
+
+struct ChargeLinePayload:  Codable {
     let id: Int32
     let name: String
     let cap: Decimal
     let funded: Decimal
     let dateStart: String
     let dateEnd: String
-    let employee_ids: [Int]?
+    let employee_ids: [Int32]?
 }
 
 struct TimesheetPayload: Codable{
     let id: Int
-    let employeeID: Int
+    let employeeID: Int32
     let month: Int
     let year: Int
-    let dateCreated: Date?
-    let dateSubmitted: Date?
+    let dateCreated: String?
+    let dateSubmitted: String?
     let submitted: Bool
     let enabled: Bool
     let version: Int
@@ -159,6 +275,9 @@ public struct GLTFunctions {
         nameLast: String,
         dob: Date,
         endDate: Date? = nil,
+        manager_HR: Bool,
+        manager_TimeCard: Bool,
+        manager_ChargeLine: Bool,
         email: String,
         phone: String,
         streetAddress: String,
@@ -208,19 +327,136 @@ public struct GLTFunctions {
             email: email,
             dob: formatter.string(from: dob),
             city: city,
-            state: state,
+            state: state,  
             streetAddress: streetAddress,
-            zipcode: zipCode,
+            zipCode: zipCode,
             startDate: formatter.string(from: startDate),
             endDate: endDate != nil ? formatter.string(from: endDate!) : nil,
+            managerHR: manager_HR,
+            managerTimeCard: manager_TimeCard,
+            managerChargeLine: manager_ChargeLine,
             clearanceLevel: clearanceLevel,
             authenticated: true,
-            chargeline_ids: [],
-            timesheet_ids: []
+            chargeLineIds: [],
+            timesheetIds: [],
         )
 
         postJSON(payload: employeePayload, endpoint: "https://glt.glintlock.com/employees")
     }
+    
+    // Function to get all employees
+    public static func getEmployees(context: NSManagedObjectContext) {
+        guard let employees: [EmployeePayload] = getJSON(endpoint: "https://glt.glintlock.com/employees") else {
+            print("❌ Failed to fetch employees from backend")
+            return
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+        for payload in employees {
+            let fetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id == %d", payload.id)
+
+            if let existing = try? context.fetch(fetchRequest), let emp = existing.first {
+                // Update existing employee
+                emp.nameFirst = payload.nameFirst
+                emp.nameLast = payload.nameLast
+                emp.dob = payload.dob
+                emp.email = payload.email
+                emp.phone = payload.phone
+                emp.streetAddress = payload.streetAddress
+                emp.city = payload.city
+                emp.state = payload.state
+                emp.zipCode = payload.zipCode
+                emp.clearanceLevel = payload.clearanceLevel
+                emp.authenticated = payload.authenticated
+                emp.startDate = formatter.date(from: payload.startDate) ?? Date()
+                emp.endDate = payload.endDate != nil ? formatter.date(from: payload.endDate!) : nil
+                emp.manager_HR = payload.managerHR
+                emp.manager_TimeCard = payload.managerTimeCard
+                emp.manager_ChargeLine = payload.managerChargeLine
+                emp.chargeLineIDs = payload.chargeLineIds
+                emp.timesheetIDs = payload.timesheetIds
+
+            } else {
+                // Insert new employee
+                let newEmp = Employee(context: context)
+                newEmp.id = Int32(payload.id)
+                newEmp.nameFirst = payload.nameFirst
+                newEmp.nameLast = payload.nameLast
+                newEmp.dob = payload.dob
+                newEmp.email = payload.email
+                newEmp.phone = payload.phone
+                newEmp.streetAddress = payload.streetAddress
+                newEmp.city = payload.city
+                newEmp.state = payload.state
+                newEmp.zipCode = payload.zipCode
+                newEmp.clearanceLevel = payload.clearanceLevel
+                newEmp.authenticated = payload.authenticated
+                newEmp.startDate = formatter.date(from: payload.startDate) ?? Date()
+                newEmp.endDate = payload.endDate != nil ? formatter.date(from: payload.endDate!) : nil
+                newEmp.manager_HR = payload.managerHR
+                newEmp.manager_TimeCard = payload.managerTimeCard
+                newEmp.manager_ChargeLine = payload.managerChargeLine
+                newEmp.chargeLineIDs = payload.chargeLineIds
+                newEmp.timesheetIDs = payload.timesheetIds
+            }
+        }
+
+        do {
+            try context.save()
+            print("✅ Core Data updated with \(employees.count) employees")
+        } catch {
+            print("❌ Failed to save employees to Core Data:", error)
+        }
+    }
+    
+    public static func updateEmployee(
+            employee: Employee,
+            context: NSManagedObjectContext
+        ) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            let payload = EmployeePayload(
+                id: Int(employee.id),
+                nameFirst: employee.nameFirst ?? "",
+                nameLast: employee.nameLast ?? "",
+                phone: employee.phone ?? "",
+                email: employee.email ?? "",
+                dob: employee.dob ?? "",
+                city: employee.city ?? "",
+                state: employee.state ?? "",
+                streetAddress: employee.streetAddress ?? "",
+                zipCode: employee.zipCode ?? "",
+                startDate: employee.startDate != nil ? formatter.string(from: employee.startDate!) : "",
+                endDate: employee.endDate != nil ? formatter.string(from: employee.endDate!) : nil,
+                managerHR: employee.manager_HR,
+                managerTimeCard: employee.manager_TimeCard,
+                managerChargeLine: employee.manager_ChargeLine,
+                clearanceLevel: employee.clearanceLevel ?? "",
+                authenticated: employee.authenticated,
+                chargeLineIds: employee.chargeLineIDs ?? [],
+                timesheetIds: employee.timesheetIDs ?? []
+            )
+
+            // Send PUT request
+            putJSON(payload: payload, endpoint: "https://glt.glintlock.com/employees")
+
+            // Save locally
+            do {
+                try context.save()
+                print("✅ Employee updated locally")
+            } catch {
+                print("❌ Failed to update employee locally:", error)
+            }
+        }
+    
+
+
 
     
     // Function to add a new charge line
@@ -257,6 +493,94 @@ public struct GLTFunctions {
             postJSON(payload: chargeLinePayload, endpoint: "https://glt.glintlock.com/chargelines")
     }
     
+    // Function to get a charge line
+    public static func getChargeLines(context: NSManagedObjectContext) {
+            guard let chargeLines: [ChargeLinePayload] = getJSON(endpoint: "https://glt.glintlock.com/chargelines") else {
+                print("❌ Failed to fetch ChargeLines from backend")
+                return
+            }
+            
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MM/dd/yyyy"
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            for payload in chargeLines {
+                let request: NSFetchRequest<ChargeLine> = ChargeLine.fetchRequest()
+                request.predicate = NSPredicate(format: "clID == %d", payload.id)
+                
+                if let existing = try? context.fetch(request), let cl = existing.first {
+                    // Update existing ChargeLine
+                    cl.clName = payload.name
+                    cl.clCap = payload.cap as NSDecimalNumber
+                    cl.clFunded = payload.funded as NSDecimalNumber
+                    cl.clDateStart = payload.dateStart
+                    cl.clDateEnd = payload.dateEnd
+                    cl.employeeIDs = payload.employee_ids ?? []
+                } else {
+                    // Insert new ChargeLine
+                    let newCL = ChargeLine(context: context)
+                    newCL.clID = Int32(payload.id)
+                    newCL.clName = payload.name
+                    newCL.clCap = payload.cap as NSDecimalNumber
+                    newCL.clFunded = payload.funded as NSDecimalNumber
+                    newCL.clDateStart = payload.dateStart
+                    newCL.clDateEnd = payload.dateEnd
+                    newCL.employeeIDs = payload.employee_ids ?? []
+                }
+            }
+            
+            do {
+                try context.save()
+                print("✅ Core Data updated with \(chargeLines.count) ChargeLines")
+            } catch {
+                print("❌ Failed to save ChargeLines to Core Data:", error)
+            }
+        }
+
+    
+    // Function to update a charge line
+    public static func updateChargeLine(
+        chargeLine: ChargeLine, // Core Data object
+        context: NSManagedObjectContext
+    ) {
+        // Safely unwrap optionals
+        guard let name = chargeLine.clName,
+              let dateStart = chargeLine.clDateStart,
+              let dateEnd = chargeLine.clDateEnd else {
+            print("❌ ChargeLine missing required fields")
+            return
+        }
+
+        let cap = chargeLine.clCap?.decimalValue ?? 0
+        let funded = chargeLine.clFunded?.decimalValue ?? 0
+
+        let employeeIDs = chargeLine.employeeIDs ?? []
+
+        let payload = ChargeLinePayload(
+            id: chargeLine.clID,
+            name: name,
+            cap: cap,
+            funded: funded,
+            dateStart: dateStart,
+            dateEnd: dateEnd,
+            employee_ids: employeeIDs.isEmpty ? nil : employeeIDs
+        )
+
+        // Send PUT request
+        putJSON(payload: payload, endpoint: "https://glt.glintlock.com/chargelines")
+
+        // Save locally if necessary
+        do {
+            try context.save()
+            print("✅ ChargeLine updated locally")
+        } catch {
+            print("❌ Failed to update ChargeLine locally:", error)
+        }
+    }
+
+
+
+    
     public static func addTimesheet(byID targetID: Int32, month: Int16? = nil, year: Int16? = nil, context: NSManagedObjectContext) -> Timesheet? {
         let newTS = Timesheet(context: context)
         let EMPfetchRequest: NSFetchRequest<Employee> = Employee.fetchRequest()
@@ -283,59 +607,26 @@ public struct GLTFunctions {
             employee.addToTimesheet(newTS)
             
             try context.save()
+            print("✅ Timesheet saved locally")
             
-            // Prepare payload for backend
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime] // full RFC3339 format
+
             let timesheetPayload = TimesheetPayload(
                 id: Int(newTS.id),
-                employeeID: Int(newTS.employeeID),
+                employeeID: Int32(Int(newTS.employeeID)),
                 month: Int(newTS.month),
                 year: Int(newTS.year),
-                dateCreated: newTS.dateCreated,
-                dateSubmitted: newTS.dateSubmitted,
+                dateCreated: newTS.dateCreated != nil ? formatter.string(from: newTS.dateCreated!) : nil,
+                dateSubmitted: newTS.dateSubmitted != nil ? formatter.string(from: newTS.dateSubmitted!) : nil,
                 submitted: newTS.submitted,
                 enabled: newTS.enabled,
                 version: Int(newTS.version)
             )
-            
-            // Client certificate auth
-            guard let auth = ClientCertificateAuth(p12Name: "client1", p12Password: "STEMWorks2026!") else {
-                print("❌ Failed to load client certificate")
-                return newTS
-            }
-            
-            let config = URLSessionConfiguration.default
-            let session = URLSession(configuration: config, delegate: auth, delegateQueue: nil)
-            
-            guard let url = URL(string: "https://glt.glintlock.com/timesheets/") else {
-                print("Invalid URL")
-                return newTS
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-            
-            let encoder = JSONEncoder()
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-            encoder.dateEncodingStrategy = .formatted(dateFormatter)
-            
-            request.httpBody = try encoder.encode(timesheetPayload)
-            
-            session.dataTask(with: request) { data, response, error in
-                if let error = error {
-                    print("Backend POST failed: \(error)")
-                    return
-                }
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("🌐 Backend status code: \(httpResponse.statusCode)")
-                }
-                if let data = data {
-                    print("Backend response: \(String(data: data, encoding: .utf8) ?? "No response body")")
-                }
-            }.resume()
-            
+
+            // this action tends to be slow and takes up time,
+            postJSON(payload: timesheetPayload, endpoint: "https://glt.glintlock.com/timesheets")
+//            
             return newTS
             
         } catch {
@@ -343,6 +634,7 @@ public struct GLTFunctions {
             return nil
         }
     }
+
 
     
     public static func addTimesheetCharge(clName: String, clCap: NSDecimalNumber, clFunded: NSDecimalNumber, clDateStart: String, clDateEnd: String, context: NSManagedObjectContext) {
@@ -357,9 +649,9 @@ public struct GLTFunctions {
         
         do {
             try context.save()
-            print("Employee added successfully")
+            print("TSCharge added successfully")
         } catch {
-            print("Failed to save the new employee: \(error)")
+            print("Failed to save the new TSCharge: \(error)")
         }
         
     }

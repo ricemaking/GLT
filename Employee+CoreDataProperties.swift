@@ -2,7 +2,7 @@
 //  Employee+CoreDataProperties.swift
 //  GLT
 //
-//  Created by Player_1 on 4/7/25.
+//  Created by dylan domingo on 9/3/25.
 //
 //
 
@@ -21,6 +21,7 @@ extension Employee {
     @NSManaged public var clearanceLevel: String?
     @NSManaged public var dob: String?
     @NSManaged public var email: String?
+    @NSManaged public var endDate: Date?
     @NSManaged public var id: Int32
     @NSManaged public var manager_ChargeLine: Bool
     @NSManaged public var manager_HR: Bool
@@ -32,7 +33,8 @@ extension Employee {
     @NSManaged public var state: String?
     @NSManaged public var streetAddress: String?
     @NSManaged public var zipCode: String?
-    @NSManaged public var endDate: Date?
+    @NSManaged public var chargeLineIDs: [Int32]?
+    @NSManaged public var timesheetIDs: [Int32]?
     @NSManaged public var chargeLine: NSSet?
     @NSManaged public var timesheet: NSSet?
     @NSManaged public var tsCharge: NSSet?

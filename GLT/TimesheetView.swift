@@ -202,26 +202,6 @@ struct TimesheetView: View {
                         }
                     }
                     .padding(.vertical, 8)
-                    /*
-                    if !pendingOfflineTSCharges.isEmpty {
-                        Text("Offline Changes Detected")
-                            .font(.headline)
-
-                        List {
-                            ForEach(pendingOfflineTSCharges, id: \.objectID) { charge in
-                                VStack(alignment: .leading) {
-                                    Text("Date: \(charge.month)/\(charge.day)/\(charge.year)")
-                                    Text("Hours: \(charge.hours)")
-                                    Text("Charge ID: \(charge.chargeID)")
-                                    Text("Version:  \(charge.version)")
-                                }
-                            }
-                        }
-        */
-                        
-                    //}
-                     
-                    
 
                     if !pendingOfflineTSCharges.isEmpty {
                         Text("Offline Changes Detected")
@@ -652,7 +632,7 @@ struct OfflineChangesTabView: View {
                 let charges = groupedCharges[key] ?? []
 
                 if let firstCharge = charges.first {
-                    ScrollView { // 👈 Add this ScrollView to make tab scrollable
+                    ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
                             if let formattedDate = Calendar.current.date(from: DateComponents(year: Int(firstCharge.year), month: Int(firstCharge.month), day: Int(firstCharge.day))) {
                                 Text("\(TimesheetView.displayDateFormatter.string(from: formattedDate)) - Charge \(key.chargeID)")
@@ -680,6 +660,6 @@ struct OfflineChangesTabView: View {
             }
         }
         .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-        .frame(height: 300) // Optional: remove if you want dynamic height
+        .frame(height: 300)
     }
 }
